@@ -20,7 +20,8 @@ Open `http://127.0.0.1:8000`. The API documentation is available at `http://127.
 3. Search by filename or filter by status to focus the inbox on a working queue.
 4. Retry a failed document from the inbox to send it through the workflow again.
 5. Open a workflow-complete row to edit the generated summary and save it through the edit API.
-6. Submit the review to persist `hitlcompleted`. That state is read-only but remains viewable.
+6. Review the source PDF beside the summary on desktop, or open it in a modal on smaller screens.
+7. Submit the review to persist `hitlcompleted`. That state is read-only but remains viewable.
 
 ## API surface
 

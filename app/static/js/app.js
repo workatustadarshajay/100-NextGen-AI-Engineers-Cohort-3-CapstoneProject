@@ -416,32 +416,79 @@
             return;
         }
 
-        const pdfPreview = page.querySelector("#pdf-preview");
-        const pdfPageInput = page.querySelector("[data-pdf-page]");
-        const previousPdfPage = page.querySelector("[data-pdf-page-action=previous]");
-        const nextPdfPage = page.querySelector("[data-pdf-page-action=next]");
+        const pdfViewers = [...page.querySelectorAll("[data-pdf-viewer]")];
+        const pdfModal = page.querySelector("#pdf-modal");
+        const openPdfModalButton = page.querySelector("#open-pdf-modal");
+        const closePdfModalButton = page.querySelector("#close-pdf-modal");
+        const pdfModalBackdrop = page.querySelector("[data-pdf-modal-backdrop]");
         let currentPdfPage = 1;
+        let lastFocusedElement = null;
 
         const setPdfPage = (requestedPage) => {
-            if (!pdfPreview || !pdfPageInput) {
+            if (!pdfViewers.length) {
                 return;
             }
             const parsedPage = Number.parseInt(requestedPage, 10);
             currentPdfPage = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
-            pdfPageInput.value = currentPdfPage;
-            pdfPreview.src = `${pdfPreview.dataset.pdfUrl}#page=${currentPdfPage}`;
-            if (previousPdfPage) {
-                previousPdfPage.disabled = currentPdfPage <= 1;
-            }
+            pdfViewers.forEach((viewer) => {
+                const pdfPreview = viewer.querySelector("iframe[data-pdf-url]");
+                const pdfPageInput = viewer.querySelector("[data-pdf-page]");
+                const previousPdfPage = viewer.querySelector("[data-pdf-page-action=previous]");
+                if (pdfPageInput) {
+                    pdfPageInput.value = currentPdfPage;
+                }
+                if (pdfPreview) {
+                    pdfPreview.src = `${pdfPreview.dataset.pdfUrl}#page=${currentPdfPage}`;
+                }
+                if (previousPdfPage) {
+                    previousPdfPage.disabled = currentPdfPage <= 1;
+                }
+            });
         };
 
-        previousPdfPage?.addEventListener("click", () => setPdfPage(currentPdfPage - 1));
-        nextPdfPage?.addEventListener("click", () => setPdfPage(currentPdfPage + 1));
-        pdfPageInput?.addEventListener("change", () => setPdfPage(pdfPageInput.value));
-        pdfPageInput?.addEventListener("keydown", (event) => {
-            if (event.key === "Enter") {
-                event.preventDefault();
-                setPdfPage(pdfPageInput.value);
+        pdfViewers.forEach((viewer) => {
+            const previousPdfPage = viewer.querySelector("[data-pdf-page-action=previous]");
+            const nextPdfPage = viewer.querySelector("[data-pdf-page-action=next]");
+            const pdfPageInput = viewer.querySelector("[data-pdf-page]");
+            previousPdfPage?.addEventListener("click", () => setPdfPage(currentPdfPage - 1));
+            nextPdfPage?.addEventListener("click", () => setPdfPage(currentPdfPage + 1));
+            pdfPageInput?.addEventListener("change", () => setPdfPage(pdfPageInput.value));
+            pdfPageInput?.addEventListener("keydown", (event) => {
+                if (event.key === "Enter") {
+                    event.preventDefault();
+                    setPdfPage(pdfPageInput.value);
+                }
+            });
+        });
+
+        const closePdfModal = () => {
+            if (!pdfModal) {
+                return;
+            }
+            pdfModal.classList.add("hidden");
+            pdfModal.setAttribute("aria-hidden", "true");
+            document.body.classList.remove("overflow-hidden");
+            lastFocusedElement?.focus();
+        };
+
+        const openPdfModal = () => {
+            if (!pdfModal) {
+                return;
+            }
+            lastFocusedElement = document.activeElement;
+            pdfModal.classList.remove("hidden");
+            pdfModal.setAttribute("aria-hidden", "false");
+            document.body.classList.add("overflow-hidden");
+            setPdfPage(currentPdfPage);
+            closePdfModalButton?.focus();
+        };
+
+        openPdfModalButton?.addEventListener("click", openPdfModal);
+        closePdfModalButton?.addEventListener("click", closePdfModal);
+        pdfModalBackdrop?.addEventListener("click", closePdfModal);
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape" && pdfModal && !pdfModal.classList.contains("hidden")) {
+                closePdfModal();
             }
         });
 
