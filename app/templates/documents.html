@@ -71,10 +71,37 @@
                 </a>
             </div>
         </form>
+        <div data-bulk-toolbar class="hidden flex-col gap-3 border-b border-slate-100 bg-cyan-50/50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div class="flex items-center gap-2 text-sm font-semibold text-ink">
+                <i data-lucide="check-square" class="h-4 w-4 text-signal"></i>
+                <span><span data-selected-count>0</span> selected</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <select data-bulk-assignee class="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-ink outline-none focus:border-signal focus:ring-2 focus:ring-cyan-100">
+                    <option value="">Assign reviewer</option>
+                    {% for reviewer in reviewers %}
+                    <option value="{{ reviewer.id }}">{{ reviewer.email }}</option>
+                    {% endfor %}
+                </select>
+                <button type="button" data-bulk-action="assign" class="button-secondary min-h-9 px-3 text-xs" disabled>
+                    <i data-lucide="user-round-plus" class="h-4 w-4"></i><span>Assign</span>
+                </button>
+                <button type="button" data-bulk-action="mark_reviewed" class="button-secondary min-h-9 px-3 text-xs" disabled>
+                    <i data-lucide="badge-check" class="h-4 w-4"></i><span>Mark reviewed</span>
+                </button>
+                <button type="button" data-bulk-action="export" class="button-secondary min-h-9 px-3 text-xs" disabled>
+                    <i data-lucide="download" class="h-4 w-4"></i><span>Export</span>
+                </button>
+                <button type="button" data-bulk-action="delete" class="button-danger min-h-9 px-3 text-xs" disabled>
+                    <i data-lucide="trash-2" class="h-4 w-4"></i><span>Delete</span>
+                </button>
+            </div>
+        </div>
         <div class="overflow-x-auto">
             <table class="w-full min-w-[720px] border-collapse text-left">
                 <thead class="bg-slate-50/80">
                     <tr class="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
+                        <th class="w-12 px-4 py-3.5 sm:px-6"><input type="checkbox" data-select-all class="h-4 w-4 rounded border-slate-300 text-signal focus:ring-cyan-200" aria-label="Select all documents on this page"></th>
                         <th class="px-4 py-3.5 sm:px-6">Name</th>
                         <th class="px-4 py-3.5 sm:px-6">Status</th>
                         <th class="px-4 py-3.5 sm:px-6">Date received</th>
@@ -85,6 +112,7 @@
                     {% for document in documents %}
                     {% set openable = document.status in ['workflowcompleted', 'hitlcompleted'] %}
                     <tr class="table-row {% if openable %}is-openable{% endif %}" data-document-id="{{ document.id }}" data-openable="{{ 'true' if openable else 'false' }}" tabindex="{{ '0' if openable else '-1' }}">
+                        <td class="w-12 px-4 py-4 sm:px-6"><input type="checkbox" data-document-select value="{{ document.id }}" class="h-4 w-4 rounded border-slate-300 text-signal focus:ring-cyan-200" aria-label="Select {{ document.file_name }}"></td>
                         <td class="px-4 py-4 sm:px-6">
                             <div class="flex min-w-0 items-center justify-between gap-4">
                                 <div class="flex min-w-0 items-center gap-3">
@@ -103,6 +131,7 @@
                                     <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 focus:outline-none focus:ring-2 focus:ring-rose-200" data-delete-document="{{ document.id }}" data-file-name="{{ document.file_name }}" aria-label="Delete {{ document.file_name }}" title="Delete PDF">
                                         <i data-lucide="trash-2" class="h-4 w-4"></i>
                                     </button>
+                                </div>
                             </div>
                         </td>
                         <td class="px-4 py-4 sm:px-6"><span class="status-pill status-{{ document.status }}">{{ document.status|status_label }}</span></td>
@@ -110,7 +139,7 @@
                         <td class="whitespace-nowrap px-4 py-4 text-sm text-slate-600 sm:px-6">{{ document.updated_at|format_datetime }}</td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="4" class="px-6 py-16 text-center text-sm text-slate-500">No documents have entered the workflow yet.</td></tr>
+                    <tr><td colspan="5" class="px-6 py-16 text-center text-sm text-slate-500">No documents have entered the workflow yet.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>

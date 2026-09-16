@@ -1,27 +1,34 @@
 import asyncio
+import csv
+import io
 from pathlib import Path
 from math import ceil
 from typing import Annotated
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, UploadFile, status
-from fastapi.responses import FileResponse
-from sqlalchemy import func, select
+from fastapi.responses import FileResponse, StreamingResponse
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
 from app.database import UPLOADS_DIR, get_session
-from app.models import Document, DocumentStatus, utc_now
+from app.models import Document, DocumentAssignment, DocumentStatus, Notification, User, utc_now
 from app.schemas import (
+    BulkActionResponse,
+    BulkDocumentActionRequest,
     DocumentDetailResponse,
+    DocumentExportRequest,
     DocumentListItem,
     DocumentPageResponse,
     DocumentStatus as DocumentStatusSchema,
     DeleteDocumentResponse,
     EditDocumentRequest,
+    ReviewerResponse,
     UploadResponse,
 )
 from app.services.workflow import run_workflow
+from app.services.notifications import add_notification
 
 
 router = APIRouter(prefix="/api", tags=["documents"])
@@ -89,6 +96,25 @@ async def _get_document(session: AsyncSession, document_id: int) -> Document:
             detail="Document not found",
         )
     return document
+
+
+async def _get_authenticated_user(request: Request, session: AsyncSession) -> User:
+    user = await get_current_user(request, session)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+    return user
+
+
+async def _delete_document_relations(session: AsyncSession, document_id: int) -> None:
+    await session.execute(
+        delete(DocumentAssignment).where(DocumentAssignment.document_id == document_id)
+    )
+    await session.execute(
+        delete(Notification).where(Notification.document_id == document_id)
+    )
 
 
 @router.post("/upload", response_model=UploadResponse, status_code=status.HTTP_201_CREATED)
@@ -175,6 +201,143 @@ async def display_documents(
     )
 
 
+@router.get("/reviewers", response_model=list[ReviewerResponse])
+async def list_reviewers(request: Request, session: SessionDep) -> list[ReviewerResponse]:
+    """Return users available for document assignment."""
+    await _get_authenticated_user(request, session)
+    result = await session.execute(select(User).order_by(User.email))
+    return [ReviewerResponse(id=user.id, email=user.email) for user in result.scalars().all()]
+
+
+@router.post("/documents/bulk", response_model=BulkActionResponse)
+async def bulk_document_action(
+    payload: BulkDocumentActionRequest,
+    request: Request,
+    session: SessionDep,
+) -> BulkActionResponse:
+    """Apply one operation to up to 100 selected documents."""
+    current_user = await _get_authenticated_user(request, session)
+    document_ids = list(dict.fromkeys(payload.document_ids))
+    assignee = None
+    if payload.action == "assign":
+        if payload.assignee_id is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Choose a reviewer")
+        assignee = await session.get(User, payload.assignee_id)
+        if assignee is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reviewer not found")
+
+    affected_count = 0
+    skipped_count = 0
+    for document_id in document_ids:
+        document = await session.get(Document, document_id)
+        if document is None:
+            skipped_count += 1
+            continue
+
+        if payload.action == "delete":
+            stored_path = _safe_stored_path(document)
+            if stored_path and stored_path.is_file():
+                try:
+                    await asyncio.to_thread(stored_path.unlink)
+                except OSError as error:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=f"The stored PDF for {document.file_name} could not be removed",
+                    ) from error
+
+            await _delete_document_relations(session, document.id)
+            await session.delete(document)
+            affected_count += 1
+            continue
+
+        if payload.action == "assign":
+            assignment = await session.scalar(
+                select(DocumentAssignment).where(DocumentAssignment.document_id == document.id)
+            )
+            if assignment is None:
+                session.add(
+                    DocumentAssignment(document_id=document.id, user_id=assignee.id)
+                )
+            else:
+                assignment.user_id = assignee.id
+                assignment.assigned_at = utc_now()
+            await add_notification(
+                session,
+                kind="document_assigned",
+                title="Document assigned",
+                message=f"{document.file_name} was assigned to you for review.",
+                document_id=document.id,
+                user_id=assignee.id,
+            )
+            affected_count += 1
+            continue
+
+        if document.status != DocumentStatus.WORKFLOW_COMPLETED.value:
+            skipped_count += 1
+            continue
+        document.status = DocumentStatus.HITL_COMPLETED.value
+        document.updated_at = utc_now()
+        await add_notification(
+            session,
+            kind="document_submitted",
+            title="Document submitted",
+            message=f"{document.file_name} was marked as reviewed by {current_user.email}.",
+            document_id=document.id,
+        )
+        affected_count += 1
+
+    await session.commit()
+    if payload.action == "delete":
+        message = "Selected documents were deleted."
+    elif payload.action == "assign":
+        message = f"Selected documents were assigned to {assignee.email}."
+    else:
+        message = "Selected documents were marked as reviewed."
+    return BulkActionResponse(
+        action=payload.action,
+        affected_count=affected_count,
+        skipped_count=skipped_count,
+        message=message,
+    )
+
+
+@router.post("/documents/export")
+async def export_documents(
+    payload: DocumentExportRequest,
+    request: Request,
+    session: SessionDep,
+) -> StreamingResponse:
+    """Export selected document records as a CSV file."""
+    await _get_authenticated_user(request, session)
+    document_ids = list(dict.fromkeys(payload.document_ids))
+    result = await session.execute(
+        select(Document)
+        .where(Document.id.in_(document_ids))
+        .order_by(Document.created_at.desc(), Document.id.desc())
+    )
+    documents = result.scalars().all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["id", "file_name", "status", "date_received", "modified", "summary", "error"])
+    for document in documents:
+        writer.writerow(
+            [
+                document.id,
+                document.file_name,
+                document.status,
+                document.created_at.isoformat(),
+                document.updated_at.isoformat(),
+                document.summary or "",
+                document.error_message or "",
+            ]
+        )
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="neuron-document-export.csv"'},
+    )
+
+
 @router.delete("/documents/{document_id}", response_model=DeleteDocumentResponse)
 async def delete_document(
     document_id: int,
@@ -193,6 +356,7 @@ async def delete_document(
             detail="The stored PDF could not be removed",
         ) from error
 
+    await _delete_document_relations(session, document.id)
     await session.delete(document)
     await session.commit()
     return DeleteDocumentResponse(id=document_id, message="Document deleted")
@@ -324,9 +488,11 @@ async def edit_document(
 @router.post("/submit/{document_id}", response_model=DocumentDetailResponse)
 async def submit_document(
     document_id: int,
+    request: Request,
     session: SessionDep,
 ) -> DocumentDetailResponse:
     """Lock the reviewed summary and mark it as human-in-the-loop complete."""
+    reviewer = await _get_authenticated_user(request, session)
     document = await _get_document(session, document_id)
     if document.status != DocumentStatus.WORKFLOW_COMPLETED.value:
         raise HTTPException(
@@ -336,6 +502,13 @@ async def submit_document(
 
     document.status = DocumentStatus.HITL_COMPLETED.value
     document.updated_at = utc_now()
+    await add_notification(
+        session,
+        kind="document_submitted",
+        title="Document submitted",
+        message=f"{document.file_name} was submitted for final record by {reviewer.email}.",
+        document_id=document.id,
+    )
     await session.commit()
     await session.refresh(document)
     return _serialize_detail(document)

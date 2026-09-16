@@ -22,6 +22,9 @@ Open `http://127.0.0.1:8000`. The API documentation is available at `http://127.
 5. Open a workflow-complete row to edit the generated summary and save it through the edit API.
 6. Review the source PDF beside the summary on desktop, or open it in a modal on smaller screens.
 7. Submit the review to persist `hitlcompleted`. That state is read-only but remains viewable.
+8. Use the operations dashboard at `/dashboard` to monitor throughput, processing time, review queues, failures, and reviewer workload.
+9. Select inbox rows to assign documents, mark ready documents as reviewed, export selected records to CSV, or delete multiple documents together.
+10. Use the notification bell for processing completion/failure, assignments, submitted reviews, and overdue review reminders.
 
 ## API surface
 
@@ -34,8 +37,16 @@ Open `http://127.0.0.1:8000`. The API documentation is available at `http://127.
 - `DELETE /api/documents/{document_id}` removes the PDF and its document record.
 - `PATCH /api/edit/{document_id}` saves a workflow-complete summary.
 - `POST /api/submit/{document_id}` locks the summary as HITL complete.
+- `POST /api/documents/bulk` applies `delete`, `assign`, or `mark_reviewed` to up to 100 document IDs.
+- `POST /api/documents/export` downloads selected document records as CSV.
+- `GET /api/reviewers` lists users available for assignment.
+- `GET /api/dashboard` returns operational metrics and reviewer workloads.
+- `GET /api/notifications` lists recent notifications and the unread count.
+- `POST /api/notifications/{notification_id}/read` marks one notification read.
+- `POST /api/notifications/read-all` marks all visible notifications read.
 
 The inbox filters are preserved while paging and during live status refresh. Failed documents expose the existing `POST /api/summarise/{document_id}` endpoint as a retry action.
+Assignments are stored separately from document records, and overdue review reminders are de-duplicated per document.
 
 The local database is created at `data/documents.db`; uploaded files are stored under `data/uploads/`.
 
@@ -49,4 +60,5 @@ pytest -q tests/test_retrieve_the_docs.py
 pytest -q tests/test_summarise_and_generate_test.py
 pytest -q tests/test_document_inbox.py
 pytest -q tests/test_document_files.py
+pytest -q tests/test_operations.py
 ```

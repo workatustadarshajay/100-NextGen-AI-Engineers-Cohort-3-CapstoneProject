@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
 from app.database import get_session
-from app.models import Document, DocumentStatus
+from app.models import Document, DocumentStatus, User
 from app.routers.documents import DEFAULT_PAGE_SIZE, build_document_filters
 
 
@@ -98,6 +98,8 @@ async def documents_page(
     documents = result.scalars().all()
     status_result = await session.execute(status_query)
     counts = Counter(dict(status_result.all()))
+    reviewer_result = await session.execute(select(User).order_by(User.email))
+    reviewers = reviewer_result.scalars().all()
     return templates.TemplateResponse(
         request=request,
         name="documents.html",
@@ -111,6 +113,7 @@ async def documents_page(
             "total_pages": total_pages,
             "search": (search or "").strip(),
             "status_filter": status_filter.value if status_filter else "",
+            "reviewers": reviewers,
             "notice": request.query_params.get("notice"),
             "current_user": user,
         },

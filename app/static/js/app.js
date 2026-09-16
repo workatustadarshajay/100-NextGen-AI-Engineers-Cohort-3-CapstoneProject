@@ -148,7 +148,7 @@
             return;
         }
         if (!documents.length) {
-            body.innerHTML = `<tr><td colspan="4" class="px-6 py-16 text-center text-sm text-slate-500">No documents have entered the workflow yet.</td></tr>`;
+            body.innerHTML = `<tr><td colspan="5" class="px-6 py-16 text-center text-sm text-slate-500">No documents have entered the workflow yet.</td></tr>`;
             return;
         }
 
@@ -159,6 +159,7 @@
                 : "";
             return `
                 <tr class="table-row ${isOpenable ? "is-openable" : ""}" data-document-id="${documentItem.id}" data-openable="${isOpenable}" tabindex="${isOpenable ? "0" : "-1"}">
+                    <td class="w-12 px-4 py-4 sm:px-6"><input type="checkbox" data-document-select value="${documentItem.id}" class="h-4 w-4 rounded border-slate-300 text-signal focus:ring-cyan-200" aria-label="Select ${escapeHtml(documentItem.file_name)}"></td>
                     <td class="px-4 py-4 sm:px-6">
                         <div class="flex min-w-0 items-center justify-between gap-4">
                             <div class="flex min-w-0 items-center gap-3">
@@ -196,6 +197,12 @@
         const previousPageButton = pagination?.querySelector("[data-page-action=previous]");
         const nextPageButton = pagination?.querySelector("[data-page-action=next]");
         const paginationLabel = pagination?.querySelector("[data-pagination-label]");
+        const tableBody = page.querySelector("#document-table-body");
+        const selectAll = page.querySelector("[data-select-all]");
+        const bulkToolbar = page.querySelector("[data-bulk-toolbar]");
+        const selectedCount = page.querySelector("[data-selected-count]");
+        const bulkAssignee = page.querySelector("[data-bulk-assignee]");
+        const bulkActionButtons = [...page.querySelectorAll("[data-bulk-action]")];
         const filterForm = page.querySelector("[data-inbox-filters]");
         const searchInput = filterForm?.querySelector("[name=search]");
         const statusSelect = filterForm?.querySelector("[name=status]");
@@ -220,6 +227,42 @@
         if (new URLSearchParams(window.location.search).get("notice") === "locked") {
             setNotice(notice, "That document is still processing and cannot be opened yet.", "");
         }
+
+        const getSelectedIds = () => [...page.querySelectorAll("[data-document-select]:checked")]
+            .map((checkbox) => Number.parseInt(checkbox.value, 10))
+            .filter((documentId) => Number.isInteger(documentId));
+
+        const updateBulkToolbar = () => {
+            const selectedIds = getSelectedIds();
+            const hasSelection = selectedIds.length > 0;
+            bulkToolbar?.classList.toggle("hidden", !hasSelection);
+            bulkToolbar?.classList.toggle("flex", hasSelection);
+            if (selectedCount) {
+                selectedCount.textContent = selectedIds.length;
+            }
+            bulkActionButtons.forEach((button) => {
+                button.disabled = !hasSelection || (button.dataset.bulkAction === "assign" && !bulkAssignee?.value);
+            });
+            if (selectAll) {
+                const checkboxes = [...page.querySelectorAll("[data-document-select]")];
+                selectAll.checked = checkboxes.length > 0 && checkboxes.every((checkbox) => checkbox.checked);
+                selectAll.indeterminate = hasSelection && !selectAll.checked;
+            }
+        };
+
+        const resetBulkSelection = () => {
+            page.querySelectorAll("[data-document-select]").forEach((checkbox) => {
+                checkbox.checked = false;
+            });
+            if (selectAll) {
+                selectAll.checked = false;
+                selectAll.indeterminate = false;
+            }
+            if (bulkAssignee) {
+                bulkAssignee.value = "";
+            }
+            updateBulkToolbar();
+        };
 
         const refreshStats = (documents, payload) => {
             const counts = payload.counts || documents.reduce((result, item) => {
@@ -301,6 +344,7 @@
                     renderPagination(documents);
                 }
                 highlightNewRow();
+                updateBulkToolbar();
                 const processing = items.some((item) => item.status === "summarising");
                 if (processing) {
                     window.setTimeout(() => refreshDocuments(currentPage), 1800);
@@ -310,7 +354,87 @@
             }
         };
 
-        document.querySelector("#document-table-body")?.addEventListener("click", async (event) => {
+        const performBulkAction = async (action) => {
+            const documentIds = getSelectedIds();
+            if (!documentIds.length) {
+                return;
+            }
+            if (action === "assign" && !bulkAssignee?.value) {
+                setNotice(notice, "Choose a reviewer before assigning documents.", "error");
+                return;
+            }
+            if (action === "delete" && !window.confirm(`Delete ${documentIds.length} selected document${documentIds.length === 1 ? "" : "s"}? This action cannot be undone.`)) {
+                return;
+            }
+
+            bulkActionButtons.forEach((button) => {
+                button.disabled = true;
+            });
+            try {
+                const payload = { document_ids: documentIds, action };
+                if (action === "assign") {
+                    payload.assignee_id = Number.parseInt(bulkAssignee.value, 10);
+                }
+                const endpoint = action === "export" ? "/api/documents/export" : "/api/documents/bulk";
+                const response = await fetch(endpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Accept: "application/json" },
+                    body: JSON.stringify(action === "export" ? { document_ids: documentIds } : payload),
+                });
+                if (!response.ok) {
+                    let detail = "Bulk action failed";
+                    try {
+                        const errorPayload = await response.json();
+                        detail = errorPayload.detail || detail;
+                    } catch {
+                        detail = "Bulk action failed";
+                    }
+                    throw new Error(detail);
+                }
+                if (action === "export") {
+                    const downloadUrl = URL.createObjectURL(await response.blob());
+                    const link = document.createElement("a");
+                    link.href = downloadUrl;
+                    link.download = "neuron-document-export.csv";
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    URL.revokeObjectURL(downloadUrl);
+                    setNotice(notice, "The selected records were exported.", "success");
+                } else {
+                    const result = await response.json();
+                    setNotice(notice, `${result.message} ${result.skipped_count ? `${result.skipped_count} skipped.` : ""}`.trim(), "success");
+                    resetBulkSelection();
+                    await refreshDocuments(currentPage);
+                }
+            } catch (error) {
+                setNotice(notice, error.message, "error");
+            } finally {
+                updateBulkToolbar();
+            }
+        };
+
+        tableBody?.addEventListener("change", (event) => {
+            if (event.target.matches("[data-document-select]")) {
+                updateBulkToolbar();
+            }
+        });
+        selectAll?.addEventListener("change", () => {
+            page.querySelectorAll("[data-document-select]").forEach((checkbox) => {
+                checkbox.checked = selectAll.checked;
+            });
+            updateBulkToolbar();
+        });
+        bulkAssignee?.addEventListener("change", updateBulkToolbar);
+        bulkActionButtons.forEach((button) => {
+            button.addEventListener("click", () => performBulkAction(button.dataset.bulkAction));
+        });
+
+        tableBody?.addEventListener("click", async (event) => {
+            if (event.target.closest("[data-document-select]")) {
+                event.stopPropagation();
+                return;
+            }
             const retryButton = event.target.closest("[data-retry-document]");
             if (retryButton) {
                 event.preventDefault();
@@ -363,7 +487,10 @@
                 window.location.assign(`/documents/${row.dataset.documentId}`);
             }
         });
-        document.querySelector("#document-table-body")?.addEventListener("keydown", (event) => {
+        tableBody?.addEventListener("keydown", (event) => {
+            if (event.target.closest("[data-document-select]")) {
+                return;
+            }
             if (event.target.closest("[data-delete-document]")) {
                 return;
             }
@@ -562,10 +689,93 @@
         });
     };
 
+    const initNotifications = () => {
+        const root = document.querySelector("[data-notifications]");
+        if (!root) {
+            return;
+        }
+        const toggle = root.querySelector("[data-notifications-toggle]");
+        const panel = root.querySelector("[data-notifications-panel]");
+        const count = root.querySelector("[data-notification-count]");
+        const list = root.querySelector("[data-notifications-list]");
+        const readAll = root.querySelector("[data-notifications-read-all]");
+
+        const renderNotifications = (payload) => {
+            const notifications = payload.notifications || [];
+            const unreadCount = Number(payload.unread_count) || 0;
+            if (count) {
+                count.textContent = unreadCount > 99 ? "99+" : unreadCount;
+                count.classList.toggle("hidden", unreadCount === 0);
+            }
+            if (!list) {
+                return;
+            }
+            if (!notifications.length) {
+                list.innerHTML = '<div class="px-4 py-8 text-center text-xs font-semibold text-slate-400">No notifications yet.</div>';
+                return;
+            }
+            list.innerHTML = notifications.map((notification) => `
+                <button type="button" data-notification-id="${notification.id}" data-document-id="${notification.document_id || ""}" class="flex w-full items-start gap-3 border-b border-slate-100 px-4 py-3 text-left transition hover:bg-slate-50 ${notification.read_at ? "" : "bg-cyan-50/50"}">
+                    <span class="mt-1 h-2 w-2 shrink-0 rounded-full ${notification.read_at ? "bg-slate-200" : "bg-signal"}"></span>
+                    <span class="min-w-0">
+                        <span class="block text-xs font-bold text-ink">${escapeHtml(notification.title)}</span>
+                        <span class="mt-1 block text-xs leading-5 text-slate-500">${escapeHtml(notification.message)}</span>
+                        <span class="mt-1 block text-[10px] font-semibold text-slate-400">${escapeHtml(formatDate(notification.created_at))}</span>
+                    </span>
+                </button>
+            `).join("");
+        };
+
+        const loadNotifications = async () => {
+            try {
+                const response = await fetch("/api/notifications?limit=8", { headers: { Accept: "application/json" } });
+                if (response.ok) {
+                    renderNotifications(await response.json());
+                }
+            } catch {
+                // Notifications should not interrupt the document workflow.
+            }
+        };
+
+        toggle?.addEventListener("click", () => {
+            const isHidden = panel?.classList.toggle("hidden");
+            toggle.setAttribute("aria-expanded", String(isHidden === false));
+            if (isHidden === false) {
+                loadNotifications();
+            }
+        });
+        readAll?.addEventListener("click", async () => {
+            await fetch("/api/notifications/read-all", { method: "POST" });
+            loadNotifications();
+        });
+        list?.addEventListener("click", async (event) => {
+            const notification = event.target.closest("[data-notification-id]");
+            if (!notification) {
+                return;
+            }
+            await fetch(`/api/notifications/${notification.dataset.notificationId}/read`, { method: "POST" });
+            const documentId = notification.dataset.documentId;
+            if (documentId) {
+                window.location.assign(`/documents/${documentId}`);
+            } else {
+                loadNotifications();
+            }
+        });
+        document.addEventListener("click", (event) => {
+            if (!root.contains(event.target) && panel && !panel.classList.contains("hidden")) {
+                panel.classList.add("hidden");
+                toggle?.setAttribute("aria-expanded", "false");
+            }
+        });
+        loadNotifications();
+        window.setInterval(loadNotifications, 30000);
+    };
+
     document.addEventListener("DOMContentLoaded", () => {
         refreshIcons();
         initUploadPage();
         initDocumentsPage();
         initDetailPage();
+        initNotifications();
     });
 })();

@@ -1,5 +1,6 @@
 from datetime import datetime
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -45,6 +46,61 @@ class UploadResponse(BaseModel):
 class DeleteDocumentResponse(BaseModel):
     id: int
     message: str
+
+
+class ReviewerResponse(BaseModel):
+    id: int
+    email: str
+
+
+class BulkDocumentActionRequest(BaseModel):
+    document_ids: list[int] = Field(min_length=1, max_length=100)
+    action: Literal["delete", "assign", "mark_reviewed"]
+    assignee_id: int | None = None
+
+
+class BulkActionResponse(BaseModel):
+    action: str
+    affected_count: int
+    skipped_count: int
+    message: str
+
+
+class DocumentExportRequest(BaseModel):
+    document_ids: list[int] = Field(min_length=1, max_length=100)
+
+
+class NotificationResponse(BaseModel):
+    id: int
+    document_id: int | None = None
+    kind: str
+    title: str
+    message: str
+    read_at: datetime | None = None
+    created_at: datetime
+
+
+class NotificationPageResponse(BaseModel):
+    notifications: list[NotificationResponse]
+    unread_count: int
+
+
+class ReviewerWorkload(BaseModel):
+    reviewer: str
+    assigned_count: int
+    pending_count: int
+
+
+class DashboardResponse(BaseModel):
+    processed_today: int
+    average_processing_minutes: float
+    pending_reviews: int
+    failed_workflows: int
+    total_documents: int
+    completed_documents: int
+    outstanding_documents: int
+    status_counts: dict[str, int]
+    reviewer_workloads: list[ReviewerWorkload]
 
 
 class EditDocumentRequest(BaseModel):

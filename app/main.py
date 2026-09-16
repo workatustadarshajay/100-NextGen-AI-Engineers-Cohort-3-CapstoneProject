@@ -9,7 +9,9 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.database import engine, init_db
 from app.routers.auth import router as auth_router
+from app.routers.dashboard import router as dashboard_router
 from app.routers.documents import router as documents_router
+from app.routers.notifications import router as notifications_router
 from app.routers.pages import router as pages_router
 
 
@@ -35,5 +37,7 @@ app.add_middleware(
 static_directory = Path(__file__).resolve().parent / "static"
 app.mount("/static", StaticFiles(directory=static_directory), name="static")
 app.include_router(auth_router)
+app.include_router(dashboard_router)
 app.include_router(documents_router)
+app.include_router(notifications_router)
 app.include_router(pages_router)
