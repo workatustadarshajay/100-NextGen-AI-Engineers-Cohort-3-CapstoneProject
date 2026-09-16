@@ -36,8 +36,14 @@ def format_datetime(value) -> str:
     return value.strftime("%d %b %Y, %H:%M") if value else "-"
 
 
+def username_initials(user) -> str:
+    username = (getattr(user, "email", "") or "").split("@", 1)[0].strip()
+    return (username[:2] or "NR").upper()
+
+
 templates.env.filters["status_label"] = status_label
 templates.env.filters["format_datetime"] = format_datetime
+templates.env.filters["username_initials"] = username_initials
 
 
 def _login_redirect() -> RedirectResponse:

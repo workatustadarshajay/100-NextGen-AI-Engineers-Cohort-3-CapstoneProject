@@ -98,7 +98,7 @@
                             <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
                             Connected workspace
                         </span>
-                        <span class="flex h-9 w-9 items-center justify-center rounded-full bg-[#e7f1f2] text-xs font-bold text-[#087e88]">JS</span>
+                        <span class="flex h-9 w-9 items-center justify-center rounded-full bg-[#e7f1f2] text-xs font-bold text-[#087e88]" aria-label="{{ current_user.email if current_user else 'Neuron user' }}" title="{{ current_user.email if current_user else 'Neuron user' }}">{{ current_user|username_initials if current_user else 'NR' }}</span>
                     </div>
                 </div>
             </header>
