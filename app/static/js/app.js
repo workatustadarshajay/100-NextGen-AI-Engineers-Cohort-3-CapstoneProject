@@ -771,11 +771,52 @@
         window.setInterval(loadNotifications, 30000);
     };
 
+    const initProfileModal = () => {
+        const toggle = document.querySelector("[data-profile-toggle]");
+        const modal = document.querySelector("[data-profile-modal]");
+        const closeButton = modal?.querySelector("[data-profile-close]");
+        const backdrop = modal?.querySelector("[data-profile-backdrop]");
+        let lastFocusedElement = null;
+
+        const closeModal = () => {
+            if (!modal) {
+                return;
+            }
+            modal.classList.add("hidden");
+            modal.setAttribute("aria-hidden", "true");
+            toggle?.setAttribute("aria-expanded", "false");
+            document.body.classList.remove("overflow-hidden");
+            lastFocusedElement?.focus();
+        };
+
+        const openModal = () => {
+            if (!modal) {
+                return;
+            }
+            lastFocusedElement = document.activeElement;
+            modal.classList.remove("hidden");
+            modal.setAttribute("aria-hidden", "false");
+            toggle?.setAttribute("aria-expanded", "true");
+            document.body.classList.add("overflow-hidden");
+            closeButton?.focus();
+        };
+
+        toggle?.addEventListener("click", openModal);
+        closeButton?.addEventListener("click", closeModal);
+        backdrop?.addEventListener("click", closeModal);
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape" && modal && !modal.classList.contains("hidden")) {
+                closeModal();
+            }
+        });
+    };
+
     document.addEventListener("DOMContentLoaded", () => {
         refreshIcons();
         initUploadPage();
         initDocumentsPage();
         initDetailPage();
         initNotifications();
+        initProfileModal();
     });
 })();
