@@ -4,10 +4,12 @@ from math import ceil
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import get_current_user
 from app.database import UPLOADS_DIR, get_session
 from app.models import Document, DocumentStatus, utc_now
 from app.schemas import (
@@ -43,6 +45,16 @@ def build_document_filters(search: str | None, document_status: DocumentStatusSc
     if document_status is not None:
         filters.append(Document.status == document_status.value)
     return filters
+
+
+def _safe_stored_path(document: Document) -> Path | None:
+    stored_path = Path(document.stored_file_path)
+    try:
+        resolved_path = stored_path.resolve()
+        resolved_path.relative_to(UPLOADS_DIR.resolve())
+    except (OSError, ValueError):
+        return None
+    return resolved_path
 
 
 def _serialize_list_item(document: Document) -> DocumentListItem:
@@ -170,14 +182,10 @@ async def delete_document(
 ) -> DeleteDocumentResponse:
     """Remove a document record and its stored PDF."""
     document = await _get_document(session, document_id)
-    stored_path = Path(document.stored_file_path)
-    try:
-        stored_path.resolve().relative_to(UPLOADS_DIR.resolve())
-    except ValueError:
-        stored_path = Path()
+    stored_path = _safe_stored_path(document)
 
     try:
-        if stored_path.is_file():
+        if stored_path and stored_path.is_file():
             await asyncio.to_thread(stored_path.unlink)
     except OSError as error:
         raise HTTPException(
@@ -188,6 +196,69 @@ async def delete_document(
     await session.delete(document)
     await session.commit()
     return DeleteDocumentResponse(id=document_id, message="Document deleted")
+
+
+async def _get_authenticated_document(
+    document_id: int,
+    request: Request,
+    session: AsyncSession,
+) -> Document:
+    if await get_current_user(request, session) is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+    document = await _get_document(session, document_id)
+    if document.status not in VIEWABLE_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This document is not ready to view",
+        )
+    return document
+
+
+@router.get("/documents/{document_id}/pdf", response_class=FileResponse)
+async def view_document_pdf(
+    document_id: int,
+    request: Request,
+    session: SessionDep,
+) -> FileResponse:
+    """Stream a reviewable PDF inline for the authenticated reviewer."""
+    document = await _get_authenticated_document(document_id, request, session)
+    stored_path = _safe_stored_path(document)
+    if stored_path is None or not stored_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The source PDF is not available",
+        )
+    return FileResponse(
+        stored_path,
+        media_type="application/pdf",
+        filename=document.file_name,
+        content_disposition_type="inline",
+    )
+
+
+@router.get("/documents/{document_id}/download", response_class=FileResponse)
+async def download_document_pdf(
+    document_id: int,
+    request: Request,
+    session: SessionDep,
+) -> FileResponse:
+    """Download a reviewable PDF for the authenticated reviewer."""
+    document = await _get_authenticated_document(document_id, request, session)
+    stored_path = _safe_stored_path(document)
+    if stored_path is None or not stored_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The source PDF is not available",
+        )
+    return FileResponse(
+        stored_path,
+        media_type="application/pdf",
+        filename=document.file_name,
+        content_disposition_type="attachment",
+    )
 
 
 @router.get("/display/{document_id}", response_model=DocumentDetailResponse)

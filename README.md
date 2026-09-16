@@ -28,6 +28,8 @@ Open `http://127.0.0.1:8000`. The API documentation is available at `http://127.
 - `POST /api/summarise/{document_id}` requeues a failed document.
 - `GET /api/display?page=1&page_size=5&search=...&status=...` returns one filtered page of inbox data and status counts.
 - `GET /api/display/{document_id}` returns reviewable detail data.
+- `GET /api/documents/{document_id}/pdf` streams a reviewable PDF inline.
+- `GET /api/documents/{document_id}/download` downloads a reviewable PDF.
 - `DELETE /api/documents/{document_id}` removes the PDF and its document record.
 - `PATCH /api/edit/{document_id}` saves a workflow-complete summary.
 - `POST /api/submit/{document_id}` locks the summary as HITL complete.
@@ -45,4 +47,5 @@ pytest -q tests/test_extract_from_pdf.py
 pytest -q tests/test_retrieve_the_docs.py
 pytest -q tests/test_summarise_and_generate_test.py
 pytest -q tests/test_document_inbox.py
+pytest -q tests/test_document_files.py
 ```

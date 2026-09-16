@@ -22,7 +22,43 @@
 
     <div data-detail-notice class="notice" hidden></div>
 
-    <section class="surface animate-in delay-1 max-w-5xl p-5 sm:p-7" aria-labelledby="summary-heading">
+    <div class="grid gap-6 xl:grid-cols-2">
+        <section class="surface animate-in delay-1 overflow-hidden" aria-labelledby="source-heading">
+            <div class="flex flex-col justify-between gap-4 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-start sm:px-7">
+                <div>
+                    <p class="eyebrow">Source document</p>
+                    <h2 id="source-heading" class="mt-2 font-display text-xl font-bold tracking-[-0.03em] text-ink">Original PDF</h2>
+                    <p class="mt-1 text-sm text-slate-500">Review the source alongside the generated text.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <a href="/api/documents/{{ document.id }}/download" class="button-secondary min-h-10 px-3" title="Download PDF" aria-label="Download PDF">
+                        <i data-lucide="download" class="h-4 w-4"></i>
+                        <span class="hidden sm:inline">Download</span>
+                    </a>
+                    <a href="/api/documents/{{ document.id }}/pdf" target="_blank" rel="noopener" class="button-secondary min-h-10 px-3" title="Open PDF in a new tab" aria-label="Open PDF in a new tab">
+                        <i data-lucide="external-link" class="h-4 w-4"></i>
+                        <span class="hidden sm:inline">New tab</span>
+                    </a>
+                </div>
+            </div>
+            <div class="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/70 px-5 py-3 sm:px-7">
+                <button type="button" data-pdf-page-action="previous" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-signal hover:text-signal focus:outline-none focus:ring-2 focus:ring-cyan-200 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Previous PDF page" title="Previous page" disabled>
+                    <i data-lucide="chevron-left" class="h-4 w-4"></i>
+                </button>
+                <label class="flex items-center gap-2 text-xs font-semibold text-slate-500" for="pdf-page-number">
+                    Page
+                    <input id="pdf-page-number" data-pdf-page type="number" min="1" value="1" inputmode="numeric" class="h-9 w-16 rounded-lg border border-slate-200 bg-white px-2 text-center text-sm font-bold text-ink outline-none focus:border-signal focus:ring-2 focus:ring-cyan-100" aria-label="PDF page number">
+                </label>
+                <button type="button" data-pdf-page-action="next" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-signal hover:text-signal focus:outline-none focus:ring-2 focus:ring-cyan-200" aria-label="Next PDF page" title="Next page">
+                    <i data-lucide="chevron-right" class="h-4 w-4"></i>
+                </button>
+            </div>
+            <div class="bg-slate-800 p-2 sm:p-3">
+                <iframe id="pdf-preview" data-pdf-url="/api/documents/{{ document.id }}/pdf" src="/api/documents/{{ document.id }}/pdf#page=1" class="h-[620px] min-h-[520px] w-full rounded-lg bg-white sm:h-[720px]" title="PDF preview for {{ document.file_name }}"></iframe>
+            </div>
+        </section>
+
+        <section class="surface animate-in delay-2 p-5 sm:p-7" aria-labelledby="summary-heading">
             <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
                 <div>
                     <p class="eyebrow">Generated summary</p>
@@ -49,6 +85,7 @@
                     </button>
                 </div>
             </div>
-    </section>
+        </section>
+    </div>
 </div>
 {% endblock %}

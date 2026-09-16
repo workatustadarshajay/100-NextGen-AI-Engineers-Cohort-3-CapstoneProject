@@ -416,6 +416,35 @@
             return;
         }
 
+        const pdfPreview = page.querySelector("#pdf-preview");
+        const pdfPageInput = page.querySelector("[data-pdf-page]");
+        const previousPdfPage = page.querySelector("[data-pdf-page-action=previous]");
+        const nextPdfPage = page.querySelector("[data-pdf-page-action=next]");
+        let currentPdfPage = 1;
+
+        const setPdfPage = (requestedPage) => {
+            if (!pdfPreview || !pdfPageInput) {
+                return;
+            }
+            const parsedPage = Number.parseInt(requestedPage, 10);
+            currentPdfPage = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+            pdfPageInput.value = currentPdfPage;
+            pdfPreview.src = `${pdfPreview.dataset.pdfUrl}#page=${currentPdfPage}`;
+            if (previousPdfPage) {
+                previousPdfPage.disabled = currentPdfPage <= 1;
+            }
+        };
+
+        previousPdfPage?.addEventListener("click", () => setPdfPage(currentPdfPage - 1));
+        nextPdfPage?.addEventListener("click", () => setPdfPage(currentPdfPage + 1));
+        pdfPageInput?.addEventListener("change", () => setPdfPage(pdfPageInput.value));
+        pdfPageInput?.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                setPdfPage(pdfPageInput.value);
+            }
+        });
+
         const documentId = page.dataset.documentId;
         const editor = page.querySelector("#summary-editor");
         const saveButton = page.querySelector("#save-edit");
