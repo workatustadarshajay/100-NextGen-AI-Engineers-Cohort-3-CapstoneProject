@@ -23,23 +23,16 @@
     <div data-detail-notice class="notice" hidden></div>
 
     <div class="grid gap-6 lg:grid-cols-2">
-        <section data-pdf-viewer class="surface animate-in delay-1 hidden overflow-hidden lg:block" aria-labelledby="source-heading">
-            <div class="flex flex-col justify-between gap-4 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-start sm:px-7">
-                <div>
-                    <p class="eyebrow">Source document</p>
-                    <h2 id="source-heading" class="mt-2 font-display text-xl font-bold tracking-[-0.03em] text-ink">Original PDF</h2>
-                    <p class="mt-1 text-sm text-slate-500">Review the source alongside the generated text.</p>
-                </div>
-                <div class="flex items-center gap-2">
-                    <a href="/api/documents/{{ document.id }}/download" class="button-secondary min-h-10 px-3" title="Download PDF" aria-label="Download PDF">
-                        <i data-lucide="download" class="h-4 w-4"></i>
-                        <span class="hidden sm:inline">Download</span>
-                    </a>
-                    <a href="/api/documents/{{ document.id }}/pdf" target="_blank" rel="noopener" class="button-secondary min-h-10 px-3" title="Open PDF in a new tab" aria-label="Open PDF in a new tab">
-                        <i data-lucide="external-link" class="h-4 w-4"></i>
-                        <span class="hidden sm:inline">New tab</span>
-                    </a>
-                </div>
+        <section data-pdf-viewer class="surface animate-in delay-1 hidden overflow-hidden lg:block" aria-label="Source PDF preview">
+            <div class="flex justify-end gap-2 border-b border-slate-100 px-5 py-4 sm:px-7">
+                <a href="/api/documents/{{ document.id }}/download" class="button-secondary min-h-10 px-3" title="Download PDF" aria-label="Download PDF">
+                    <i data-lucide="download" class="h-4 w-4"></i>
+                    <span class="hidden sm:inline">Download</span>
+                </a>
+                <a href="/api/documents/{{ document.id }}/pdf" target="_blank" rel="noopener" class="button-secondary min-h-10 px-3" title="Open PDF in a new tab" aria-label="Open PDF in a new tab">
+                    <i data-lucide="external-link" class="h-4 w-4"></i>
+                    <span class="hidden sm:inline">New tab</span>
+                </a>
             </div>
             <div class="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/70 px-5 py-3 sm:px-7">
                 <button type="button" data-pdf-page-action="previous" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-signal hover:text-signal focus:outline-none focus:ring-2 focus:ring-cyan-200 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Previous PDF page" title="Previous page" disabled>
@@ -95,11 +88,8 @@
     <div id="pdf-modal" class="fixed inset-0 z-50 hidden" role="dialog" aria-modal="true" aria-labelledby="pdf-modal-title" aria-hidden="true">
         <div data-pdf-modal-backdrop class="absolute inset-0 bg-ink/75 backdrop-blur-sm"></div>
         <section data-pdf-viewer class="relative z-10 mx-3 flex h-[calc(100vh-1.5rem)] max-h-[900px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:mx-6 sm:h-[calc(100vh-3rem)]" aria-labelledby="pdf-modal-title">
-            <div class="flex items-center justify-between gap-4 border-b border-slate-100 px-4 py-4 sm:px-6">
-                <div class="min-w-0">
-                    <p class="eyebrow">Source document</p>
-                    <h2 id="pdf-modal-title" class="mt-1 truncate font-display text-lg font-bold text-ink">{{ document.file_name }}</h2>
-                </div>
+            <div class="flex justify-end gap-2 border-b border-slate-100 px-4 py-4 sm:px-6">
+                <h2 id="pdf-modal-title" class="sr-only">Source PDF preview</h2>
                 <div class="flex items-center gap-2">
                     <a href="/api/documents/{{ document.id }}/download" class="button-secondary min-h-9 px-3" title="Download PDF" aria-label="Download PDF">
                         <i data-lucide="download" class="h-4 w-4"></i>
