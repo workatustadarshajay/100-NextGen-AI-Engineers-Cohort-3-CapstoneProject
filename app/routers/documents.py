@@ -25,12 +25,24 @@ from app.services.workflow import run_workflow
 router = APIRouter(prefix="/api", tags=["documents"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 MAX_FILE_SIZE = 10 * 1024 * 1024
-DEFAULT_PAGE_SIZE = 10
-MAX_PAGE_SIZE = 50
+DEFAULT_PAGE_SIZE = 5
+MAX_PAGE_SIZE = 5
+PAGE_SIZE_QUERY_LIMIT = 50
 VIEWABLE_STATUSES = {
     DocumentStatus.WORKFLOW_COMPLETED.value,
     DocumentStatus.HITL_COMPLETED.value,
 }
+
+
+def build_document_filters(search: str | None, document_status: DocumentStatusSchema | None):
+    filters = []
+    normalized_search = (search or "").strip()
+    if normalized_search:
+        escaped_search = normalized_search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        filters.append(Document.file_name.ilike(f"%{escaped_search}%", escape="\\"))
+    if document_status is not None:
+        filters.append(Document.status == document_status.value)
+    return filters
 
 
 def _serialize_list_item(document: Document) -> DocumentListItem:
@@ -117,20 +129,29 @@ async def upload_document(
 async def display_documents(
     session: SessionDep,
     page: Annotated[int, Query(ge=1)] = 1,
-    page_size: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = DEFAULT_PAGE_SIZE,
+    page_size: Annotated[int, Query(ge=1, le=PAGE_SIZE_QUERY_LIMIT)] = DEFAULT_PAGE_SIZE,
+    search: Annotated[str | None, Query(max_length=255)] = None,
+    status_filter: Annotated[DocumentStatusSchema | None, Query(alias="status")] = None,
 ) -> DocumentPageResponse:
     """Return one page of status table data, newest first."""
-    total = int(await session.scalar(select(func.count()).select_from(Document)) or 0)
+    page_size = min(page_size, MAX_PAGE_SIZE)
+    filters = build_document_filters(search, status_filter)
+    count_query = select(func.count()).select_from(Document)
+    document_query = select(Document).order_by(Document.created_at.desc(), Document.id.desc())
+    status_query = select(Document.status, func.count(Document.id)).group_by(Document.status)
+    if filters:
+        count_query = count_query.where(*filters)
+        document_query = document_query.where(*filters)
+        status_query = status_query.where(*filters)
+
+    total = int(await session.scalar(count_query) or 0)
     total_pages = max(1, ceil(total / page_size))
     result = await session.execute(
-        select(Document)
-        .order_by(Document.created_at.desc(), Document.id.desc())
+        document_query
         .offset((page - 1) * page_size)
         .limit(page_size)
     )
-    status_result = await session.execute(
-        select(Document.status, func.count(Document.id)).group_by(Document.status)
-    )
+    status_result = await session.execute(status_query)
     counts = {document_status: count for document_status, count in status_result.all()}
     return DocumentPageResponse(
         items=[_serialize_list_item(document) for document in result.scalars().all()],

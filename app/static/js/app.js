@@ -154,6 +154,9 @@
 
         body.innerHTML = documents.map((documentItem) => {
             const isOpenable = viewableStatuses.has(documentItem.status);
+            const retryMarkup = documentItem.status === "failed"
+                ? `<button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-amber-50 hover:text-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-200" data-retry-document="${documentItem.id}" data-file-name="${escapeHtml(documentItem.file_name)}" aria-label="Retry ${escapeHtml(documentItem.file_name)}" title="Retry processing"><i data-lucide="refresh-cw" class="h-4 w-4"></i></button>`
+                : "";
             return `
                 <tr class="table-row ${isOpenable ? "is-openable" : ""}" data-document-id="${documentItem.id}" data-openable="${isOpenable}" tabindex="${isOpenable ? "0" : "-1"}">
                     <td class="px-4 py-4 sm:px-6">
@@ -165,9 +168,12 @@
                                     <span class="mt-1 block text-xs text-slate-400">PDF document</span>
                                 </span>
                             </div>
-                            <button type="button" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 focus:outline-none focus:ring-2 focus:ring-rose-200" data-delete-document="${documentItem.id}" data-file-name="${escapeHtml(documentItem.file_name)}" aria-label="Delete ${escapeHtml(documentItem.file_name)}" title="Delete PDF">
-                                <i data-lucide="trash-2" class="h-4 w-4"></i>
-                            </button>
+                            <div class="flex shrink-0 items-center gap-1">
+                                ${retryMarkup}
+                                <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 focus:outline-none focus:ring-2 focus:ring-rose-200" data-delete-document="${documentItem.id}" data-file-name="${escapeHtml(documentItem.file_name)}" aria-label="Delete ${escapeHtml(documentItem.file_name)}" title="Delete PDF">
+                                    <i data-lucide="trash-2" class="h-4 w-4"></i>
+                                </button>
+                            </div>
                         </div>
                     </td>
                     <td class="px-4 py-4 sm:px-6">${statusMarkup(documentItem.status)}</td>
@@ -190,9 +196,24 @@
         const previousPageButton = pagination?.querySelector("[data-page-action=previous]");
         const nextPageButton = pagination?.querySelector("[data-page-action=next]");
         const paginationLabel = pagination?.querySelector("[data-pagination-label]");
-        const newDocumentId = new URLSearchParams(window.location.search).get("new");
-        const pageSize = 10;
-        let currentPage = 1;
+        const filterForm = page.querySelector("[data-inbox-filters]");
+        const searchInput = filterForm?.querySelector("[name=search]");
+        const statusSelect = filterForm?.querySelector("[name=status]");
+        const queryParams = new URLSearchParams(window.location.search);
+        const newDocumentId = queryParams.get("new");
+        const requestedPage = Number.parseInt(queryParams.get("page") || "1", 10);
+        const pageSize = 5;
+        let currentPage = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+        let filters = {
+            search: (queryParams.get("search") || "").trim(),
+            status: queryParams.get("status") || "",
+        };
+        if (searchInput) {
+            searchInput.value = filters.search;
+        }
+        if (statusSelect) {
+            statusSelect.value = filters.status;
+        }
         if (newDocumentId) {
             setNotice(notice, "Your PDF is in the queue. This inbox will update when the workflow finishes.", "success");
         }
@@ -229,6 +250,13 @@
             paginationLabel.textContent = `Page ${currentPage} of ${totalPages}`;
             previousPageButton.disabled = currentPage <= 1;
             nextPageButton.disabled = currentPage >= totalPages;
+            const url = new URL(window.location.href);
+            if (currentPage > 1) {
+                url.searchParams.set("page", currentPage);
+            } else {
+                url.searchParams.delete("page");
+            }
+            window.history.replaceState({}, "", url);
             refreshIcons();
         };
 
@@ -244,9 +272,23 @@
 
         const refreshDocuments = async (requestedPage = currentPage) => {
             try {
-                const response = await fetch(`/api/display?page=${requestedPage}&page_size=${pageSize}`, { headers: { Accept: "application/json" } });
+                const params = new URLSearchParams({ page: requestedPage, page_size: pageSize });
+                if (filters.search) {
+                    params.set("search", filters.search);
+                }
+                if (filters.status) {
+                    params.set("status", filters.status);
+                }
+                const response = await fetch(`/api/display?${params}`, { headers: { Accept: "application/json" } });
                 if (!response.ok) {
-                    throw new Error("Could not load the document inbox");
+                    let detail = "";
+                    try {
+                        const errorPayload = await response.json();
+                        detail = errorPayload.detail || "";
+                    } catch {
+                        detail = "";
+                    }
+                    throw new Error(detail || "The document inbox is temporarily unavailable.");
                 }
                 const documents = await response.json();
                 const items = Array.isArray(documents) ? documents : documents.items;
@@ -269,6 +311,30 @@
         };
 
         document.querySelector("#document-table-body")?.addEventListener("click", async (event) => {
+            const retryButton = event.target.closest("[data-retry-document]");
+            if (retryButton) {
+                event.preventDefault();
+                event.stopPropagation();
+                const originalMarkup = retryButton.innerHTML;
+                retryButton.disabled = true;
+                retryButton.innerHTML = '<i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i>';
+                refreshIcons();
+                try {
+                    const response = await fetch(`/api/summarise/${retryButton.dataset.retryDocument}`, { method: "POST" });
+                    const payload = await response.json();
+                    if (!response.ok) {
+                        throw new Error(payload.detail || "Could not retry the document");
+                    }
+                    setNotice(notice, "The document has been queued for processing again.", "success");
+                    await refreshDocuments(currentPage);
+                } catch (error) {
+                    retryButton.disabled = false;
+                    retryButton.innerHTML = originalMarkup;
+                    setNotice(notice, error.message, "error");
+                    refreshIcons();
+                }
+                return;
+            }
             const deleteButton = event.target.closest("[data-delete-document]");
             if (deleteButton) {
                 event.preventDefault();
@@ -317,6 +383,28 @@
             if (nextPage >= 1) {
                 refreshDocuments(nextPage);
             }
+        });
+
+        filterForm?.addEventListener("submit", (event) => {
+            event.preventDefault();
+            filters = {
+                search: searchInput?.value.trim() || "",
+                status: statusSelect?.value || "",
+            };
+            const url = new URL(window.location.href);
+            url.searchParams.delete("page");
+            if (filters.search) {
+                url.searchParams.set("search", filters.search);
+            } else {
+                url.searchParams.delete("search");
+            }
+            if (filters.status) {
+                url.searchParams.set("status", filters.status);
+            } else {
+                url.searchParams.delete("status");
+            }
+            window.history.pushState({}, "", url);
+            refreshDocuments(1);
         });
 
         refreshDocuments();

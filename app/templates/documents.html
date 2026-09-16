@@ -19,7 +19,7 @@
     <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
         <div class="surface animate-in delay-1 p-4 sm:p-5">
             <p class="text-xs font-semibold text-slate-500">Total files</p>
-            <p class="stat-number mt-2" data-stat="total">{{ documents|length }}</p>
+            <p class="stat-number mt-2" data-stat="total">{{ total_documents }}</p>
         </div>
         <div class="surface animate-in delay-1 p-4 sm:p-5">
             <p class="text-xs font-semibold text-slate-500">Processing</p>
@@ -43,6 +43,34 @@
             </div>
             <span class="flex items-center gap-2 text-xs font-semibold text-slate-400"><span class="h-2 w-2 rounded-full bg-emerald-500"></span>Live status refresh</span>
         </div>
+        <form data-inbox-filters class="flex flex-col gap-3 border-b border-slate-100 bg-slate-50/60 px-4 py-4 sm:flex-row sm:items-end sm:px-6">
+            <div class="min-w-0 flex-1">
+                <label for="document-search" class="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Find a file</label>
+                <div class="relative">
+                    <i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i>
+                    <input id="document-search" name="search" type="search" value="{{ search }}" placeholder="Search by filename" class="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-ink outline-none transition placeholder:text-slate-400 focus:border-signal focus:ring-4 focus:ring-cyan-100" autocomplete="off">
+                </div>
+            </div>
+            <div class="sm:w-52">
+                <label for="document-status" class="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Status</label>
+                <select id="document-status" name="status" class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-ink outline-none transition focus:border-signal focus:ring-4 focus:ring-cyan-100">
+                    <option value="" {% if not status_filter %}selected{% endif %}>All statuses</option>
+                    <option value="summarising" {% if status_filter == 'summarising' %}selected{% endif %}>Summarising</option>
+                    <option value="workflowcompleted" {% if status_filter == 'workflowcompleted' %}selected{% endif %}>Ready to review</option>
+                    <option value="hitlcompleted" {% if status_filter == 'hitlcompleted' %}selected{% endif %}>Signed off</option>
+                    <option value="failed" {% if status_filter == 'failed' %}selected{% endif %}>Needs attention</option>
+                </select>
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="submit" class="button-primary min-h-10 px-4">
+                    <i data-lucide="list-filter" class="h-4 w-4"></i>
+                    <span>Apply</span>
+                </button>
+                <a href="/documents" class="button-secondary min-h-10 px-3" title="Clear filters" aria-label="Clear filters">
+                    <i data-lucide="x" class="h-4 w-4"></i>
+                </a>
+            </div>
+        </form>
         <div class="overflow-x-auto">
             <table class="w-full min-w-[720px] border-collapse text-left">
                 <thead class="bg-slate-50/80">
@@ -66,9 +94,15 @@
                                         <span class="mt-1 block text-xs text-slate-400">PDF document</span>
                                     </span>
                                 </div>
-                                <button type="button" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 focus:outline-none focus:ring-2 focus:ring-rose-200" data-delete-document="{{ document.id }}" data-file-name="{{ document.file_name }}" aria-label="Delete {{ document.file_name }}" title="Delete PDF">
-                                    <i data-lucide="trash-2" class="h-4 w-4"></i>
-                                </button>
+                                <div class="flex shrink-0 items-center gap-1">
+                                    {% if document.status == 'failed' %}
+                                    <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-amber-50 hover:text-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-200" data-retry-document="{{ document.id }}" data-file-name="{{ document.file_name }}" aria-label="Retry {{ document.file_name }}" title="Retry processing">
+                                        <i data-lucide="refresh-cw" class="h-4 w-4"></i>
+                                    </button>
+                                    {% endif %}
+                                    <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 focus:outline-none focus:ring-2 focus:ring-rose-200" data-delete-document="{{ document.id }}" data-file-name="{{ document.file_name }}" aria-label="Delete {{ document.file_name }}" title="Delete PDF">
+                                        <i data-lucide="trash-2" class="h-4 w-4"></i>
+                                    </button>
                             </div>
                         </td>
                         <td class="px-4 py-4 sm:px-6"><span class="status-pill status-{{ document.status }}">{{ document.status|status_label }}</span></td>
@@ -81,12 +115,12 @@
                 </tbody>
             </table>
         </div>
-        <div id="document-pagination" data-pagination class="flex items-center justify-between gap-4 border-t border-slate-100 px-4 py-4 sm:px-6" hidden>
-            <button type="button" data-page-action="previous" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-signal hover:text-signal focus:outline-none focus:ring-2 focus:ring-cyan-200 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Previous page" title="Previous page">
+        <div id="document-pagination" data-pagination class="flex items-center justify-between gap-4 border-t border-slate-100 px-4 py-4 sm:px-6" {% if total_pages <= 1 %}hidden{% endif %}>
+            <button type="button" data-page-action="previous" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-signal hover:text-signal focus:outline-none focus:ring-2 focus:ring-cyan-200 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Previous page" title="Previous page" {% if page <= 1 %}disabled{% endif %}>
                 <i data-lucide="chevron-left" class="h-4 w-4"></i>
             </button>
-            <span data-pagination-label class="text-xs font-semibold text-slate-500">Page 1 of 1</span>
-            <button type="button" data-page-action="next" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-signal hover:text-signal focus:outline-none focus:ring-2 focus:ring-cyan-200 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Next page" title="Next page">
+            <span data-pagination-label class="text-xs font-semibold text-slate-500">Page {{ page }} of {{ total_pages }}</span>
+            <button type="button" data-page-action="next" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-signal hover:text-signal focus:outline-none focus:ring-2 focus:ring-cyan-200 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Next page" title="Next page" {% if page >= total_pages %}disabled{% endif %}>
                 <i data-lucide="chevron-right" class="h-4 w-4"></i>
             </button>
         </div>

@@ -6,14 +6,12 @@ def summarise_and_generate_test(
     """Create the generated summary from the three workflow inputs."""
     patient_name = patient_details.get("patient_name", "the patient")
     concern = medical_details.get("presenting_concern", "the reported concern")
-    history = medical_details.get("history", "No history supplied")
     medications = medical_details.get("medications", "No medications supplied")
     reference_titles = ", ".join(document["title"] for document in reference_docs)
 
     return (
         f"Clinical synthesis for {patient_name}\n\n"
         f"Presenting concern\n{concern}\n\n"
-        f"Context\n{history}\n\n"
         f"Current medications\n{medications}\n\n"
         "Recommended review\n"
         "Confirm symptom duration, review hydration and medication adherence, and "
