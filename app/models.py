@@ -59,6 +59,26 @@ class Document(Base):
     )
 
 
+class ReviewFeedback(Base):
+    __tablename__ = "review_feedback"
+    __table_args__ = (
+        Index("ix_review_feedback_document_created", "document_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    document_id: Mapped[int] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    reviewer_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    feedback_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    signal: Mapped[str] = mapped_column(String(64), nullable=False)
+    recommendation_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    details: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
 class DocumentAssignment(Base):
     __tablename__ = "document_assignments"
     __table_args__ = (

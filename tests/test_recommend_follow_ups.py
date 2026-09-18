@@ -72,3 +72,23 @@ def test_recommendation_agent_returns_prioritised_actions(fake_gemini_client):
     prompt = client.calls[0]["input"]
     assert "Critical finding present: yes" in prompt
     assert "Anaemia Investigation Pathway" in prompt
+
+
+def test_recommendation_agent_receives_bounded_reviewer_feedback(fake_gemini_client):
+    client = fake_gemini_client(RECOMMENDATION_PAYLOAD)
+    feedback_context = (
+        "Reviewer feedback profile from prior reviews:\n"
+        "- Recently rejected recommendation patterns:\n"
+        "  - Request ferritin and iron studies (reviewer reason: Not supported by this report.)"
+    )
+
+    recommend_follow_ups(
+        _analysis(),
+        [],
+        feedback_context=feedback_context,
+        client=client,
+    )
+
+    prompt = client.calls[0]["input"]
+    assert "BEGIN REVIEWER FEEDBACK PROFILE" in prompt
+    assert "Not supported by this report." in prompt

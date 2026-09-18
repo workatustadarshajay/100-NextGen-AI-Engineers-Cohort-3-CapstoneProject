@@ -24,4 +24,5 @@ class ClinicalWorkflowState(TypedDict, total=False):
     agent_events: Annotated[list[str], add]
     workflow_events: Annotated[list[dict[str, Any]], add]
     review_route: str
+    feedback_context: str
     failure: str | None

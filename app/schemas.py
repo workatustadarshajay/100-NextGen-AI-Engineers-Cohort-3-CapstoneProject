@@ -53,6 +53,7 @@ class DocumentDetailResponse(DocumentListItem):
     abnormal_findings: list[dict] = Field(default_factory=list)
     recommendations: list[dict] = Field(default_factory=list)
     citations: list[dict] = Field(default_factory=list)
+    recommendation_feedback: dict[str, str] = Field(default_factory=dict)
     workflow_events: list[WorkflowEvent] = Field(default_factory=list)
 
 
@@ -143,6 +144,7 @@ class DashboardResponse(BaseModel):
 
 class EditDocumentRequest(BaseModel):
     summary: str = Field(min_length=1, max_length=100_000)
+    feedback_reason: str | None = Field(default=None, max_length=1_000)
 
     @field_validator("summary")
     @classmethod
@@ -151,3 +153,31 @@ class EditDocumentRequest(BaseModel):
         if not cleaned_value:
             raise ValueError("Summary cannot be empty")
         return cleaned_value
+
+    @field_validator("feedback_reason")
+    @classmethod
+    def strip_feedback_reason(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned_value = value.strip()
+        return cleaned_value or None
+
+
+class RecommendationFeedbackRequest(BaseModel):
+    decision: Literal["accepted", "rejected"]
+    reason: str | None = Field(default=None, max_length=1_000)
+
+    @field_validator("reason")
+    @classmethod
+    def strip_reason(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned_value = value.strip()
+        return cleaned_value or None
+
+
+class RecommendationFeedbackResponse(BaseModel):
+    document_id: int
+    recommendation_index: int
+    decision: Literal["accepted", "rejected"]
+    message: str

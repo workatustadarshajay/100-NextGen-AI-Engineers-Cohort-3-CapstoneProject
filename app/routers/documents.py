@@ -13,7 +13,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
 from app.database import UPLOADS_DIR, get_session
-from app.models import Document, DocumentAssignment, DocumentStatus, Notification, User, utc_now
+from app.models import (
+    Document,
+    DocumentAssignment,
+    DocumentStatus,
+    Notification,
+    User,
+    utc_now,
+)
 from app.observability import log_workflow_event, safe_error_message
 from app.schemas import (
     BulkActionResponse,
@@ -26,12 +33,20 @@ from app.schemas import (
     DeleteDocumentResponse,
     EditDocumentRequest,
     ReviewerResponse,
+    RecommendationFeedbackRequest,
+    RecommendationFeedbackResponse,
     UploadResponse,
     WorkflowEventsResponse,
 )
 from app.services.workflow import run_workflow
 from app.services.notifications import add_notification
 from app.services.reconcile_summary import reconcile_summary
+from app.services.feedback_agent import (
+    RECOMMENDATION_REVIEW,
+    capture_recommendation_decision,
+    capture_summary_correction,
+    get_recommendation_feedback,
+)
 
 
 router = APIRouter(prefix="/api", tags=["documents"])
@@ -79,7 +94,10 @@ def _serialize_list_item(document: Document) -> DocumentListItem:
     )
 
 
-def _serialize_detail(document: Document) -> DocumentDetailResponse:
+def _serialize_detail(
+    document: Document,
+    recommendation_feedback: dict[str, str] | None = None,
+) -> DocumentDetailResponse:
     return DocumentDetailResponse(
         id=document.id,
         file_name=document.file_name,
@@ -97,6 +115,7 @@ def _serialize_detail(document: Document) -> DocumentDetailResponse:
         abnormal_findings=document.abnormal_findings or [],
         recommendations=document.recommendations or [],
         citations=document.reference_docs or [],
+        recommendation_feedback=recommendation_feedback or {},
         workflow_events=document.workflow_events or [],
     )
 
@@ -478,7 +497,9 @@ async def display_document(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This document is not ready to view",
         )
-    return _serialize_detail(document)
+    return _serialize_detail(
+        document, await get_recommendation_feedback(session, document.id)
+    )
 
 
 @router.get("/documents/{document_id}/workflow-events", response_model=WorkflowEventsResponse)
@@ -536,7 +557,7 @@ async def edit_document(
     session: SessionDep,
 ) -> DocumentDetailResponse:
     """Save a reviewer edit while the document is workflow-complete."""
-    await _get_authenticated_user(request, session)
+    reviewer = await _get_authenticated_user(request, session)
     document = await _get_document(session, document_id)
     if document.status != DocumentStatus.WORKFLOW_COMPLETED.value:
         raise HTTPException(
@@ -570,6 +591,7 @@ async def edit_document(
             ),
         ) from error
 
+    original_summary = document.summary
     document.summary = payload.summary
     document.patient_details = reconciled.patient.model_dump()
     document.medical_details = reconciled.medical_details.model_dump()
@@ -579,6 +601,17 @@ async def edit_document(
     document.recommendations = [
         recommendation.model_dump() for recommendation in reconciled.recommendations
     ]
+    reviewer_id = getattr(reviewer, "id", None)
+    if reviewer_id is not None:
+        feedback = capture_summary_correction(
+            document.id,
+            reviewer_id,
+            original_summary,
+            payload.summary,
+            payload.feedback_reason,
+        )
+        if feedback is not None:
+            session.add(feedback)
     document.updated_at = utc_now()
     try:
         await session.commit()
@@ -596,7 +629,63 @@ async def edit_document(
             detail="The synchronized edit could not be saved. The original document is unchanged.",
         ) from error
     await session.refresh(document)
-    return _serialize_detail(document)
+    return _serialize_detail(
+        document, await get_recommendation_feedback(session, document.id)
+    )
+
+
+@router.post(
+    "/documents/{document_id}/recommendations/{recommendation_index}/feedback",
+    response_model=RecommendationFeedbackResponse,
+)
+async def record_recommendation_feedback(
+    document_id: int,
+    recommendation_index: int,
+    payload: RecommendationFeedbackRequest,
+    request: Request,
+    session: SessionDep,
+) -> RecommendationFeedbackResponse:
+    """Record an auditable reviewer decision for one recommendation."""
+    reviewer = await _get_authenticated_user(request, session)
+    document = await _get_document(session, document_id)
+    if document.status != DocumentStatus.WORKFLOW_COMPLETED.value:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Recommendation feedback is only available before sign-off",
+        )
+    recommendations = document.recommendations or []
+    if recommendation_index < 0 or recommendation_index >= len(recommendations):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Recommendation not found",
+        )
+    if payload.decision == "rejected" and not payload.reason:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A reason is required when rejecting a recommendation",
+        )
+
+    session.add(
+        capture_recommendation_decision(
+            document.id,
+            reviewer.id,
+            recommendation_index,
+            recommendations[recommendation_index],
+            payload.decision,
+            payload.reason,
+        )
+    )
+    await session.commit()
+    return RecommendationFeedbackResponse(
+        document_id=document.id,
+        recommendation_index=recommendation_index,
+        decision=payload.decision,
+        message=(
+            "Recommendation accepted and feedback captured."
+            if payload.decision == "accepted"
+            else "Recommendation rejected and feedback captured."
+        ),
+    )
 
 
 @router.post("/submit/{document_id}", response_model=DocumentDetailResponse)
@@ -625,4 +714,6 @@ async def submit_document(
     )
     await session.commit()
     await session.refresh(document)
-    return _serialize_detail(document)
+    return _serialize_detail(
+        document, await get_recommendation_feedback(session, document.id)
+    )

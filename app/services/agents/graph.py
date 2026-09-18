@@ -161,6 +161,7 @@ def _summarise_for_route(state: ClinicalWorkflowState, review_route: str) -> dic
                 state["analysis"],
                 state.get("citations", []),
                 review_route=review_route,
+                feedback_context=state.get("feedback_context", ""),
             ),
             "agent_events": ["summary"],
         },
@@ -188,7 +189,10 @@ def recommend(state: ClinicalWorkflowState) -> dict:
         state,
         lambda: {
             "recommendations": recommend_follow_ups(
-                state["analysis"], state.get("citations", []), state.get("summary")
+                state["analysis"],
+                state.get("citations", []),
+                state.get("summary"),
+                feedback_context=state.get("feedback_context", ""),
             ),
             "agent_events": ["recommendation"],
         },
@@ -307,6 +311,7 @@ async def run_clinical_workflow(
     document_id: int,
     file_path: str,
     on_update: WorkflowUpdateCallback | None = None,
+    feedback_context: str = "",
 ) -> ClinicalWorkflowState:
     """Run the graph and expose node updates for persistence and monitoring."""
     graph = get_clinical_graph()
@@ -317,6 +322,7 @@ async def run_clinical_workflow(
         "workflow_events": [],
         "citations": [],
         "recommendations": [],
+        "feedback_context": feedback_context,
         "failure": None,
     }
     final_state = dict(initial_state)

@@ -6,6 +6,7 @@ from app.models import Document, DocumentStatus, utc_now
 from app.observability import log_workflow_event, make_workflow_event, safe_error_message
 from app.services.agents.graph import run_clinical_workflow
 from app.services.ai.schemas import ClinicalSummary
+from app.services.feedback_agent import build_feedback_context
 from app.services.notifications import add_notification
 
 
@@ -81,6 +82,8 @@ async def run_workflow(document_id: int, file_path: str) -> None:
                 if "on_update" in workflow_parameters
                 else {}
             )
+            if "feedback_context" in workflow_parameters:
+                workflow_kwargs["feedback_context"] = await build_feedback_context(session)
             state = await run_clinical_workflow(document_id, file_path, **workflow_kwargs)
             failure = state.get("failure")
         except Exception as error:

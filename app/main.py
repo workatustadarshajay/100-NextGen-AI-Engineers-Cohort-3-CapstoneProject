@@ -44,6 +44,12 @@ app.add_middleware(
     secret_key=SESSION_SECRET,
 )
 
+
+@app.get("/health", include_in_schema=False)
+async def health() -> dict[str, str]:
+    """Liveness probe for container orchestrators and load balancers."""
+    return {"status": "ok"}
+
 static_directory = Path(__file__).resolve().parent / "static"
 app.mount("/static", StaticFiles(directory=static_directory), name="static")
 app.include_router(auth_router)

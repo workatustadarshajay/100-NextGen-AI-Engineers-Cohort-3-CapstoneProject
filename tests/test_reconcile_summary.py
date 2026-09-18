@@ -125,7 +125,7 @@ async def _test_edit_document_persists_reconciled_fields(tmp_path, monkeypatch):
     monkeypatch.setattr(documents_router, "reconcile_summary", lambda *args, **kwargs: _reconciled_result())
 
     async def fake_current_user(request, session):
-        return object()
+        return SimpleNamespace(id=1)
 
     monkeypatch.setattr(documents_router, "get_current_user", fake_current_user)
 
@@ -193,7 +193,7 @@ async def _test_edit_document_does_not_save_when_reconciliation_fails(tmp_path, 
     engine, session_factory = await _create_test_session_factory(tmp_path / "documents.db")
 
     async def fake_current_user(request, session):
-        return object()
+        return SimpleNamespace(id=1)
 
     monkeypatch.setattr(documents_router, "get_current_user", fake_current_user)
 

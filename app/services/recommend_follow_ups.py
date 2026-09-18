@@ -18,9 +18,17 @@ def recommend_follow_ups(
     reference_docs: list[GuidelineCitation],
     summary: ClinicalSummary | None = None,
     *,
+    feedback_context: str = "",
     client=None,
 ) -> list[Recommendation]:
     """Recommendation Agent: propose guideline-backed follow-up actions."""
+    feedback_section = (
+        "\n\n--- BEGIN REVIEWER FEEDBACK PROFILE ---\n"
+        f"{feedback_context}\n"
+        "--- END REVIEWER FEEDBACK PROFILE ---"
+        if feedback_context
+        else ""
+    )
     prompt = (
         f"Presenting concern: {analysis.presenting_concern}\n"
         f"History: {analysis.history}\n"
@@ -31,6 +39,7 @@ def recommend_follow_ups(
         f"{format_findings(analysis.abnormal_findings)}\n\n"
         "Retrieved guideline excerpts:\n"
         f"{format_citations(reference_docs)}"
+        f"{feedback_section}"
     )
     result = generate_structured(
         RecommendationSet, prompt, RECOMMENDATION_SYSTEM, client=client

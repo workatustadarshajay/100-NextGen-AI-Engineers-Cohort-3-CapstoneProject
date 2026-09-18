@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import get_current_user
 from app.database import get_session
 from app.models import Document, DocumentStatus, User
+from app.services.feedback_agent import get_recommendation_feedback
 from app.routers.documents import DEFAULT_PAGE_SIZE, build_document_filters
 from app.templating import create_templates
 
@@ -120,6 +121,7 @@ async def document_detail_page(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
     if document.status not in VIEWABLE_STATUSES:
         return RedirectResponse(url="/documents?notice=locked", status_code=status.HTTP_303_SEE_OTHER)
+    recommendation_feedback = await get_recommendation_feedback(session, document.id)
 
     return templates.TemplateResponse(
         request=request,
@@ -128,6 +130,7 @@ async def document_detail_page(
             "active_page": "documents",
             "document": document,
             "is_editable": document.status == DocumentStatus.WORKFLOW_COMPLETED.value,
+            "recommendation_feedback": recommendation_feedback,
             "current_user": user,
         },
     )

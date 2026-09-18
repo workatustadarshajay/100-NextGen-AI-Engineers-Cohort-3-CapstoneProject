@@ -741,6 +741,22 @@
         openPdfModalButton?.addEventListener("click", openPdfModal);
         closePdfModalButton?.addEventListener("click", closePdfModal);
         pdfModalBackdrop?.addEventListener("click", closePdfModal);
+        page.addEventListener("click", (event) => {
+            const evidenceButton = event.target.closest("[data-evidence-page]");
+            if (!evidenceButton) {
+                return;
+            }
+            event.preventDefault();
+            setPdfPage(evidenceButton.dataset.evidencePage);
+            if (window.matchMedia("(max-width: 1023px)").matches) {
+                openPdfModal();
+                return;
+            }
+            page.querySelector("#pdf-preview")?.closest("[data-pdf-viewer]")?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+            });
+        });
         document.addEventListener("keydown", (event) => {
             if (event.key === "Escape" && pdfModal && !pdfModal.classList.contains("hidden")) {
                 closePdfModal();
@@ -756,6 +772,120 @@
         const lockedMessage = page.querySelector("#locked-message");
         const modeLabel = page.querySelector("#detail-mode-label");
         const helperCopy = page.querySelector("#detail-helper-copy");
+        const correctionReason = page.querySelector("#edit-feedback-reason");
+        const recommendationItems = [...page.querySelectorAll("[data-recommendation-item]")];
+        let feedbackEditable = editor ? !editor.readOnly : false;
+
+        const feedbackDecisionLabel = (decision) => ({
+            accepted: "Accepted",
+            rejected: "Rejected",
+        }[decision] || "Not reviewed");
+
+        const setFeedbackError = (item, message = "") => {
+            const error = item.querySelector("[data-feedback-error]");
+            if (!error) {
+                return;
+            }
+            error.textContent = message;
+            error.hidden = !message;
+        };
+
+        const setRecommendationFeedback = (item, decision) => {
+            item.dataset.feedbackDecision = decision;
+            const status = item.querySelector("[data-feedback-status]");
+            if (status) {
+                status.textContent = feedbackDecisionLabel(decision);
+                status.className = "text-[11px] font-bold "
+                    + (decision === "accepted"
+                        ? "text-emerald-600"
+                        : decision === "rejected" ? "text-rose-600" : "text-slate-400");
+            }
+            const reasonPanel = item.querySelector("[data-feedback-reason-panel]");
+            const showReason = feedbackEditable && decision === "rejected";
+            reasonPanel?.classList.toggle("hidden", !showReason);
+            if (reasonPanel) {
+                reasonPanel.hidden = !showReason;
+            }
+        };
+
+        const setFeedbackEditable = (canEdit) => {
+            feedbackEditable = canEdit;
+            recommendationItems.forEach((item) => {
+                const decision = item.dataset.feedbackDecision || "";
+                item.querySelectorAll("[data-feedback-action], [data-feedback-submit-rejection]")
+                    .forEach((button) => { button.disabled = !canEdit; });
+                const reason = item.querySelector("[data-feedback-reason]");
+                if (reason) {
+                    reason.disabled = !canEdit;
+                }
+                setRecommendationFeedback(item, decision);
+                if (!canEdit) {
+                    setFeedbackError(item);
+                }
+            });
+        };
+
+        const submitRecommendationFeedback = async (item, decision, reason) => {
+            if (!feedbackEditable) {
+                return;
+            }
+            const recommendationIndex = item.dataset.recommendationIndex;
+            const controls = [...item.querySelectorAll("[data-feedback-action], [data-feedback-submit-rejection]")];
+            controls.forEach((button) => { button.disabled = true; });
+            setFeedbackError(item);
+            try {
+                const response = await fetch(
+                    `/api/documents/${documentId}/recommendations/${recommendationIndex}/feedback`,
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ decision, reason: reason || null }),
+                    },
+                );
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(payload.detail || "Could not save recommendation feedback");
+                }
+                setRecommendationFeedback(item, payload.decision);
+                setNotice(notice, payload.message, "success");
+            } catch (error) {
+                setNotice(notice, error.message, "error");
+            } finally {
+                controls.forEach((button) => { button.disabled = !feedbackEditable; });
+            }
+        };
+
+        recommendationItems.forEach((item) => {
+            const acceptButton = item.querySelector('[data-feedback-action="accepted"]');
+            const rejectButton = item.querySelector('[data-feedback-action="rejected"]');
+            const saveRejectionButton = item.querySelector("[data-feedback-submit-rejection]");
+            const reason = item.querySelector("[data-feedback-reason]");
+            const showRejectionForm = () => {
+                const panel = item.querySelector("[data-feedback-reason-panel]");
+                panel?.classList.remove("hidden");
+                if (panel) {
+                    panel.hidden = false;
+                }
+                reason?.focus();
+            };
+            const rejectWithReason = () => {
+                const value = reason?.value.trim() || "";
+                if (!value) {
+                    showRejectionForm();
+                    setFeedbackError(item, "Add a reason before saving a rejection.");
+                    return;
+                }
+                submitRecommendationFeedback(item, "rejected", value);
+            };
+            acceptButton?.addEventListener("click", () => {
+                submitRecommendationFeedback(item, "accepted", "");
+            });
+            rejectButton?.addEventListener("click", rejectWithReason);
+            saveRejectionButton?.addEventListener("click", rejectWithReason);
+            reason?.addEventListener("input", () => setFeedbackError(item));
+            setRecommendationFeedback(item, item.dataset.feedbackDecision || "");
+        });
+        setFeedbackEditable(feedbackEditable);
 
         if (new URLSearchParams(window.location.search).get("notice") === "reconciled") {
             setNotice(notice, "Your edit and dependent findings were synchronized.", "success");
@@ -778,6 +908,7 @@
             helperCopy.textContent = canEdit
                 ? "Make any corrections before you submit the review."
                 : "This summary is locked after human sign-off.";
+            setFeedbackEditable(canEdit);
             refreshIcons();
         };
 
@@ -788,7 +919,10 @@
                 const response = await fetch(`/api/edit/${documentId}`, {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ summary: editor.value }),
+                    body: JSON.stringify({
+                        summary: editor.value,
+                        feedback_reason: correctionReason?.value.trim() || null,
+                    }),
                 });
                 const payload = await response.json();
                 if (!response.ok) {

@@ -54,6 +54,8 @@ def test_extract_from_pdf_returns_structured_analysis(make_pdf, fake_gemini_clie
     assert len(analysis.findings) == 2
     assert [finding.test_name for finding in analysis.abnormal_findings] == ["Haemoglobin"]
     assert analysis.has_critical_finding is True
+    assert analysis.findings[0].source_page == 1
+    assert analysis.findings[0].source_excerpt == "Haemoglobin 78 g/L"
 
     request = client.calls[0]
     assert "PX-1042" in request["input"]

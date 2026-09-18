@@ -8,6 +8,7 @@ def summarise_and_generate_test(
     reference_docs: list[GuidelineCitation],
     *,
     review_route: str = "standard_review",
+    feedback_context: str = "",
     client=None,
 ) -> ClinicalSummary:
     """Summary Agent: write the clinician-facing summary of an analysed report."""
@@ -18,6 +19,13 @@ def summarise_and_generate_test(
         if review_route == "urgent_review"
         else "This report is in the standard review lane. Lead with the key clinical "
         "context, abnormal results, and proportionate follow-up."
+    )
+    feedback_section = (
+        "\n\n--- BEGIN REVIEWER FEEDBACK PROFILE ---\n"
+        f"{feedback_context}\n"
+        "--- END REVIEWER FEEDBACK PROFILE ---"
+        if feedback_context
+        else ""
     )
     prompt = (
         f"Patient: {patient.patient_name} (ID {patient.patient_id}, "
@@ -32,5 +40,6 @@ def summarise_and_generate_test(
         f"{format_findings(analysis.abnormal_findings)}\n\n"
         "Retrieved guideline excerpts:\n"
         f"{format_citations(reference_docs)}"
+        f"{feedback_section}"
     )
     return generate_structured(ClinicalSummary, prompt, SUMMARY_SYSTEM, client=client)

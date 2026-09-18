@@ -56,6 +56,18 @@ uvicorn app.main:app --reload
 
 Open `http://127.0.0.1:8000`. The API documentation is available at `http://127.0.0.1:8000/docs`.
 
+### Run with Docker
+
+```bash
+cp .env.example .env          # then set GEMINI_API_KEY and a long random SESSION_SECRET
+SEED_SYNTHETIC_DATA=1 INGEST_GUIDELINES=1 docker compose up --build -d
+```
+
+The compose file builds the image, mounts a named volume at `/app/data` (SQLite database, uploads,
+ChromaDB index, and logs), and exposes port `8000`. On the first run set `SEED_SYNTHETIC_DATA=1` to
+generate the synthetic PDF corpus and `INGEST_GUIDELINES=1` to build the guideline index; both flags
+are safe to remove afterwards. A liveness probe is exposed at `GET /health`.
+
 `GEMINI_API_KEY` is required. Without it an upload is marked `failed` with an explanatory message.
 Keys are read from the environment or `.env` only, and `.env` is gitignored.
 The default model is `gemini-3.8-flash`. A Gemini `429` quota error means the configured project

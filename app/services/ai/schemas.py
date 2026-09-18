@@ -22,6 +22,14 @@ class LabFinding(BaseModel):
     reference_range: str = Field(description="Reference range as printed, or 'not stated'.")
     flag: FindingFlag = Field(description="Whether the value is low, normal, high, or critical.")
     interpretation: str = Field(description="One clinical sentence explaining the value.")
+    source_page: int | None = Field(
+        default=None,
+        description="PDF page containing the finding, populated by the application when available.",
+    )
+    source_excerpt: str = Field(
+        default="",
+        description="Exact source text containing the finding, populated by the application when available.",
+    )
 
 
 class ReportAnalysis(BaseModel):
