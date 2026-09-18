@@ -37,6 +37,8 @@ marked `failed` rather than crashing the request.
 Every workflow writes structured JSON logs to the console and rotating `data/logs/neuron.log`.
 Document records also retain stage, attempt count, timestamps, safe error text, and event timings.
 The live dashboard polls `/api/dashboard` and displays the current agent stage while processing.
+All document and operations APIs require an authenticated session. Production startup also
+requires `APP_ENV=production` to be paired with a configured `SESSION_SECRET`.
 
 ## Run locally
 
@@ -45,7 +47,7 @@ python3 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
 
-cp .env.example .env        # then set GEMINI_API_KEY and GROQ_API_KEY
+cp .env.example .env        # then set the API keys and a long random SESSION_SECRET
 python scripts/generate_synthetic_data.py
 python scripts/ingest_guidelines.py
 
@@ -63,7 +65,8 @@ model only helps when the selected model has separate available quota.
 Set `GROQ_API_KEY` to enable the automatic text-generation fallback when Gemini returns HTTP 429.
 The fallback uses `llama-3.3-70b-versatile` by default and validates its JSON against the same
 Pydantic schemas. Groq replaces Gemini generation only; guideline embeddings still use the
-configured Gemini embedding model.
+configured Gemini embedding model. `RAG_MIN_RELEVANCE_SCORE` filters weak Chroma matches before
+they reach the summary and recommendation agents; the default is `0.2`.
 
 ## Synthetic data and the guideline index
 
@@ -95,7 +98,7 @@ configured Gemini embedding model.
 - `GET /api/documents/{document_id}/pdf` streams a reviewable PDF inline.
 - `GET /api/documents/{document_id}/download` downloads a reviewable PDF.
 - `DELETE /api/documents/{document_id}` removes the PDF and its document record.
-- `PATCH /api/edit/{document_id}` saves a workflow-complete summary.
+- `PATCH /api/edit/{document_id}` reconciles and atomically saves a workflow-complete summary with its dependent structured findings.
 - `POST /api/submit/{document_id}` locks the summary as HITL complete.
 - `POST /api/documents/bulk` applies `delete`, `assign`, or `mark_reviewed` to up to 100 document IDs.
 - `POST /api/documents/export` downloads selected document records as CSV, including abnormal counts and top priority.

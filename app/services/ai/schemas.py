@@ -74,3 +74,22 @@ class RecommendationSet(BaseModel):
     """Structured output of the Recommendation Agent."""
 
     recommendations: list[Recommendation]
+
+
+class ReconciledMedicalDetails(BaseModel):
+    """Medical context reconciled from the reviewer-edited summary."""
+
+    presenting_concern: str = Field(description="Primary reason for the encounter.")
+    history: str = Field(description="Relevant clinical history stated in the report.")
+    medications: list[str] = Field(description="Current medications listed in the report.")
+    headline: str = Field(description="One-line clinical headline for the reviewing clinician.")
+    key_points: list[str] = Field(description="Short bullet points a clinician should notice.")
+
+
+class SummaryReconciliation(BaseModel):
+    """Validated replacement fields produced after a reviewer edits a summary."""
+
+    patient: PatientProfile
+    medical_details: ReconciledMedicalDetails
+    abnormal_findings: list[LabFinding] = Field(default_factory=list)
+    recommendations: list[Recommendation] = Field(default_factory=list, max_length=6)

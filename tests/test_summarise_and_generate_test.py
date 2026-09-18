@@ -65,6 +65,18 @@ def test_summary_agent_returns_structured_summary(fake_gemini_client):
     assert "Jordan Ellis" in prompt
 
 
+def test_summary_agent_includes_urgent_review_instruction(fake_gemini_client):
+    client = fake_gemini_client(SUMMARY_PAYLOAD)
+
+    summarise_and_generate_test(
+        _analysis(), [], review_route="urgent_review", client=client
+    )
+
+    prompt = client.calls[0]["input"]
+    assert "Review lane: urgent_review" in prompt
+    assert "same-day action" in prompt
+
+
 def test_summary_agent_rejects_output_that_breaks_the_schema(fake_gemini_client):
     client = fake_gemini_client({"headline": "only a headline"})
 

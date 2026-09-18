@@ -757,6 +757,10 @@
         const modeLabel = page.querySelector("#detail-mode-label");
         const helperCopy = page.querySelector("#detail-helper-copy");
 
+        if (new URLSearchParams(window.location.search).get("notice") === "reconciled") {
+            setNotice(notice, "Your edit and dependent findings were synchronized.", "success");
+        }
+
         const setDetailState = (payload) => {
             statusTargets.forEach((target) => {
                 target.innerHTML = statusMarkup(payload.status);
@@ -778,7 +782,7 @@
         };
 
         saveButton?.addEventListener("click", async () => {
-            setBusy(saveButton, true, "Saving edit");
+            setBusy(saveButton, true, "Synchronizing findings");
             notice.hidden = true;
             try {
                 const response = await fetch(`/api/edit/${documentId}`, {
@@ -790,8 +794,7 @@
                 if (!response.ok) {
                     throw new Error(payload.detail || "Could not save the edit");
                 }
-                setDetailState(payload);
-                setNotice(notice, "Your review edit is saved to the database.", "success");
+                window.location.assign(`/documents/${documentId}?notice=reconciled`);
             } catch (error) {
                 setNotice(notice, error.message, "error");
             } finally {

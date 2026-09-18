@@ -35,4 +35,11 @@ def recommend_follow_ups(
     result = generate_structured(
         RecommendationSet, prompt, RECOMMENDATION_SYSTEM, client=client
     )
+    citation_titles = {citation.title for citation in reference_docs}
+    for recommendation in result.recommendations:
+        recommendation.supporting_titles = [
+            title
+            for title in recommendation.supporting_titles
+            if title in citation_titles
+        ]
     return result.recommendations

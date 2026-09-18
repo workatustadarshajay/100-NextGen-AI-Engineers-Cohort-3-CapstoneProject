@@ -18,6 +18,12 @@ from app.routers.pages import router as pages_router
 
 configure_logging()
 
+APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
+SESSION_SECRET = (os.getenv("SESSION_SECRET") or "").strip()
+if APP_ENV in {"production", "prod"} and not SESSION_SECRET:
+    raise RuntimeError("SESSION_SECRET must be configured when APP_ENV is production")
+SESSION_SECRET = SESSION_SECRET or "dev-only-insecure-secret"
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -35,7 +41,7 @@ app = FastAPI(
 
 app.add_middleware(
     SessionMiddleware,
-    secret_key=os.getenv("SESSION_SECRET", "dev-only-insecure-secret"),
+    secret_key=SESSION_SECRET,
 )
 
 static_directory = Path(__file__).resolve().parent / "static"

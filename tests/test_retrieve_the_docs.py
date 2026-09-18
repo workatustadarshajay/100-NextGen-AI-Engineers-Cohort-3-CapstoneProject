@@ -71,6 +71,34 @@ def test_retrieve_the_docs_limits_results_to_available_chunks(monkeypatch):
     assert collection.query_kwargs["n_results"] == 2
 
 
+def test_retrieve_the_docs_discards_low_relevance_chunks(monkeypatch):
+    _embedding_stub(monkeypatch)
+    collection = FakeCollection(
+        {
+            "documents": [["Useful excerpt", "Weak excerpt"]],
+            "metadatas": [[{"title": "Useful"}, {"title": "Weak"}]],
+            "distances": [[0.1, 0.95]],
+        }
+    )
+
+    citations = retrieve_the_docs("haemoglobin", collection=collection)
+
+    assert [citation.title for citation in citations] == ["Useful"]
+
+
+def test_retrieve_the_docs_returns_no_citations_when_all_matches_are_weak(monkeypatch):
+    _embedding_stub(monkeypatch)
+    collection = FakeCollection(
+        {
+            "documents": [["Weak excerpt"]],
+            "metadatas": [[{"title": "Weak"}]],
+            "distances": [[0.99]],
+        }
+    )
+
+    assert retrieve_the_docs("haemoglobin", collection=collection) == []
+
+
 def test_retrieve_the_docs_returns_empty_without_query_or_corpus(monkeypatch):
     _embedding_stub(monkeypatch)
     empty = FakeCollection({"documents": [[]], "metadatas": [[]], "distances": [[]]}, count=0)

@@ -15,7 +15,9 @@ from app.services.ai.schemas import (
     PatientProfile,
     Recommendation,
     RecommendationSet,
+    ReconciledMedicalDetails,
     ReportAnalysis,
+    SummaryReconciliation,
 )
 
 __all__ = [
@@ -30,7 +32,9 @@ __all__ = [
     "PatientProfile",
     "Recommendation",
     "RecommendationSet",
+    "ReconciledMedicalDetails",
     "ReportAnalysis",
+    "SummaryReconciliation",
     "embed_texts",
     "generate_structured",
     "get_client",

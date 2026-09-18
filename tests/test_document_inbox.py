@@ -16,12 +16,17 @@ async def _create_test_session_factory(database_path):
     return engine, async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
-def test_display_filters_by_filename_and_status(tmp_path):
-    asyncio.run(_test_display_filters_by_filename_and_status(tmp_path))
+def test_display_filters_by_filename_and_status(tmp_path, monkeypatch):
+    asyncio.run(_test_display_filters_by_filename_and_status(tmp_path, monkeypatch))
 
 
-async def _test_display_filters_by_filename_and_status(tmp_path):
+async def _test_display_filters_by_filename_and_status(tmp_path, monkeypatch):
     engine, session_factory = await _create_test_session_factory(tmp_path / "documents.db")
+
+    async def fake_current_user(request, session):
+        return object()
+
+    monkeypatch.setattr(documents_router, "get_current_user", fake_current_user)
     documents = [
         Document(
             file_name="alpha-intake.pdf",
@@ -79,6 +84,11 @@ def test_failed_document_can_be_requeued(monkeypatch, tmp_path):
 async def _test_failed_document_can_be_requeued(monkeypatch, tmp_path):
     engine, session_factory = await _create_test_session_factory(tmp_path / "documents.db")
     called = []
+
+    async def fake_current_user(request, session):
+        return object()
+
+    monkeypatch.setattr(documents_router, "get_current_user", fake_current_user)
 
     async def fake_run_workflow(document_id, file_path):
         called.append((document_id, file_path))

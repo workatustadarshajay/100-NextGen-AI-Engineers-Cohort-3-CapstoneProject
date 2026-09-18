@@ -7,10 +7,18 @@ def summarise_and_generate_test(
     analysis: ReportAnalysis,
     reference_docs: list[GuidelineCitation],
     *,
+    review_route: str = "standard_review",
     client=None,
 ) -> ClinicalSummary:
     """Summary Agent: write the clinician-facing summary of an analysed report."""
     patient = analysis.patient
+    lane_instruction = (
+        "This report is in the urgent review lane. Lead with the critical risk, "
+        "same-day action, and escalation urgency."
+        if review_route == "urgent_review"
+        else "This report is in the standard review lane. Lead with the key clinical "
+        "context, abnormal results, and proportionate follow-up."
+    )
     prompt = (
         f"Patient: {patient.patient_name} (ID {patient.patient_id}, "
         f"born {patient.date_of_birth}, sex {patient.sex})\n"
@@ -18,6 +26,8 @@ def summarise_and_generate_test(
         f"Presenting concern: {analysis.presenting_concern}\n"
         f"History: {analysis.history}\n"
         f"Medications: {', '.join(analysis.medications) or 'none recorded'}\n\n"
+        f"Review lane: {review_route}\n"
+        f"Review instruction: {lane_instruction}\n\n"
         "Abnormal findings:\n"
         f"{format_findings(analysis.abnormal_findings)}\n\n"
         "Retrieved guideline excerpts:\n"

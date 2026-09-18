@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import get_current_user
 from app.database import UPLOADS_DIR, get_session
 from app.models import Document, DocumentAssignment, DocumentStatus, Notification, User, utc_now
+from app.observability import log_workflow_event, safe_error_message
 from app.schemas import (
     BulkActionResponse,
     BulkDocumentActionRequest,
@@ -30,6 +31,7 @@ from app.schemas import (
 )
 from app.services.workflow import run_workflow
 from app.services.notifications import add_notification
+from app.services.reconcile_summary import reconcile_summary
 
 
 router = APIRouter(prefix="/api", tags=["documents"])
@@ -132,9 +134,11 @@ async def _delete_document_relations(session: AsyncSession, document_id: int) ->
 async def upload_document(
     background_tasks: BackgroundTasks,
     file: Annotated[UploadFile, File(description="A PDF document")],
+    request: Request,
     session: SessionDep,
 ) -> UploadResponse:
     """Store a PDF and queue the summarisation workflow."""
+    await _get_authenticated_user(request, session)
     if not file.filename or Path(file.filename).suffix.lower() != ".pdf":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -176,6 +180,7 @@ async def upload_document(
 
 @router.get("/display", response_model=DocumentPageResponse)
 async def display_documents(
+    request: Request,
     session: SessionDep,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=PAGE_SIZE_QUERY_LIMIT)] = DEFAULT_PAGE_SIZE,
@@ -183,6 +188,7 @@ async def display_documents(
     status_filter: Annotated[DocumentStatusSchema | None, Query(alias="status")] = None,
 ) -> DocumentPageResponse:
     """Return one page of status table data, newest first."""
+    await _get_authenticated_user(request, session)
     page_size = min(page_size, MAX_PAGE_SIZE)
     filters = build_document_filters(search, status_filter)
     count_query = select(func.count()).select_from(Document)
@@ -372,9 +378,11 @@ async def export_documents(
 @router.delete("/documents/{document_id}", response_model=DeleteDocumentResponse)
 async def delete_document(
     document_id: int,
+    request: Request,
     session: SessionDep,
 ) -> DeleteDocumentResponse:
     """Remove a document record and its stored PDF."""
+    await _get_authenticated_user(request, session)
     document = await _get_document(session, document_id)
     stored_path = _safe_stored_path(document)
 
@@ -457,8 +465,13 @@ async def download_document_pdf(
 
 
 @router.get("/display/{document_id}", response_model=DocumentDetailResponse)
-async def display_document(document_id: int, session: SessionDep) -> DocumentDetailResponse:
+async def display_document(
+    document_id: int,
+    request: Request,
+    session: SessionDep,
+) -> DocumentDetailResponse:
     """Return detail data only after the workflow has produced a reviewable document."""
+    await _get_authenticated_user(request, session)
     document = await _get_document(session, document_id)
     if document.status not in VIEWABLE_STATUSES:
         raise HTTPException(
@@ -490,9 +503,11 @@ async def display_workflow_events(
 async def summarise_document(
     document_id: int,
     background_tasks: BackgroundTasks,
+    request: Request,
     session: SessionDep,
 ) -> DocumentListItem:
     """Queue the three-function workflow for an existing upload."""
+    await _get_authenticated_user(request, session)
     document = await _get_document(session, document_id)
     if document.status == DocumentStatus.SUMMARISING.value:
         raise HTTPException(
@@ -517,9 +532,11 @@ async def summarise_document(
 async def edit_document(
     document_id: int,
     payload: EditDocumentRequest,
+    request: Request,
     session: SessionDep,
 ) -> DocumentDetailResponse:
     """Save a reviewer edit while the document is workflow-complete."""
+    await _get_authenticated_user(request, session)
     document = await _get_document(session, document_id)
     if document.status != DocumentStatus.WORKFLOW_COMPLETED.value:
         raise HTTPException(
@@ -527,9 +544,57 @@ async def edit_document(
             detail="Only workflow-complete documents can be edited",
         )
 
+    try:
+        reconciled = reconcile_summary(
+            payload.summary,
+            patient_details=document.patient_details,
+            medical_details=document.medical_details,
+            abnormal_findings=document.abnormal_findings or [],
+            recommendations=document.recommendations or [],
+            reference_docs=document.reference_docs or [],
+        )
+    except Exception as error:
+        await session.rollback()
+        log_workflow_event(
+            40,
+            "summary_reconciliation_failed",
+            document_id=document_id,
+            stage="reconcile_summary",
+            error=error,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "The edit was not saved because structured findings could not be "
+                f"synchronized: {safe_error_message(error)}"
+            ),
+        ) from error
+
     document.summary = payload.summary
+    document.patient_details = reconciled.patient.model_dump()
+    document.medical_details = reconciled.medical_details.model_dump()
+    document.abnormal_findings = [
+        finding.model_dump() for finding in reconciled.abnormal_findings
+    ]
+    document.recommendations = [
+        recommendation.model_dump() for recommendation in reconciled.recommendations
+    ]
     document.updated_at = utc_now()
-    await session.commit()
+    try:
+        await session.commit()
+    except Exception as error:
+        await session.rollback()
+        log_workflow_event(
+            40,
+            "summary_reconciliation_persist_failed",
+            document_id=document_id,
+            stage="reconcile_summary",
+            error=error,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="The synchronized edit could not be saved. The original document is unchanged.",
+        ) from error
     await session.refresh(document)
     return _serialize_detail(document)
 

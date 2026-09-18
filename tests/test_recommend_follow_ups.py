@@ -14,7 +14,7 @@ RECOMMENDATION_PAYLOAD = {
             "action": "Arrange same-day clinical assessment",
             "priority": "immediate",
             "rationale": "Haemoglobin is below the 80 g/L escalation threshold.",
-            "supporting_titles": ["Anaemia Investigation Pathway"],
+            "supporting_titles": ["Anaemia Investigation Pathway", "Invented source"],
         },
         {
             "action": "Request ferritin and iron studies",

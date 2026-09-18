@@ -28,6 +28,7 @@ class AISettings:
     synthetic_dir: Path
     collection_name: str
     top_k: int
+    min_relevance_score: float
     request_timeout: float
 
 
@@ -49,5 +50,6 @@ def get_ai_settings() -> AISettings:
         synthetic_dir=_resolve_path(os.getenv("SYNTHETIC_DIR", "data/synthetic")),
         collection_name=os.getenv("CHROMA_COLLECTION", "medical_guidelines"),
         top_k=int(os.getenv("RAG_TOP_K", "4")),
+        min_relevance_score=float(os.getenv("RAG_MIN_RELEVANCE_SCORE", "0.2")),
         request_timeout=float(os.getenv("GEMINI_TIMEOUT_SECONDS", "90")),
     )

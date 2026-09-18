@@ -54,16 +54,19 @@ def _citations() -> list[GuidelineCitation]:
     ]
 
 
-def _stub_agents(monkeypatch, analysis: ReportAnalysis) -> None:
+def _stub_agents(
+    monkeypatch, analysis: ReportAnalysis, summary_routes: list[str] | None = None
+) -> None:
     monkeypatch.setattr(graph_module, "extract_from_pdf", lambda path, **kw: analysis)
     monkeypatch.setattr(graph_module, "retrieve_the_docs", lambda query, **kw: _citations())
-    monkeypatch.setattr(
-        graph_module,
-        "summarise_and_generate_test",
-        lambda a, c, **kw: ClinicalSummary(
+    def fake_summary(a, c, **kwargs):
+        if summary_routes is not None:
+            summary_routes.append(kwargs.get("review_route", ""))
+        return ClinicalSummary(
             headline="Critically low haemoglobin", summary="Body text.", key_points=["Escalate"]
-        ),
-    )
+        )
+
+    monkeypatch.setattr(graph_module, "summarise_and_generate_test", fake_summary)
     monkeypatch.setattr(
         graph_module,
         "recommend_follow_ups",
@@ -80,7 +83,8 @@ def _stub_agents(monkeypatch, analysis: ReportAnalysis) -> None:
 
 
 def test_graph_runs_agents_in_sequence(monkeypatch):
-    _stub_agents(monkeypatch, _analysis())
+    summary_routes = []
+    _stub_agents(monkeypatch, _analysis(), summary_routes)
 
     state = asyncio.run(graph_module.run_clinical_workflow(1, "report.pdf"))
 
@@ -94,6 +98,7 @@ def test_graph_runs_agents_in_sequence(monkeypatch):
     assert len(state["citations"]) == 1
     assert state["recommendations"][0].priority == "immediate"
     assert state["review_route"] == "urgent_review"
+    assert summary_routes == ["urgent_review"]
     assert {event["stage"] for event in state["workflow_events"]} >= {
         "analyze_report",
         "retrieve_guidelines",
@@ -105,12 +110,14 @@ def test_graph_runs_agents_in_sequence(monkeypatch):
 
 
 def test_graph_routes_noncritical_findings_to_standard_lane(monkeypatch):
-    _stub_agents(monkeypatch, _analysis(flag="high"))
+    summary_routes = []
+    _stub_agents(monkeypatch, _analysis(flag="high"), summary_routes)
 
     state = asyncio.run(graph_module.run_clinical_workflow(3, "report.pdf"))
 
     assert state["failure"] is None
     assert state["review_route"] == "standard_review"
+    assert summary_routes == ["standard_review"]
     assert any(
         event["stage"] == "prepare_standard_review"
         for event in state["workflow_events"]

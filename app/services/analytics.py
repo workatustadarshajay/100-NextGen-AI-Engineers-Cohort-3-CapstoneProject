@@ -28,7 +28,7 @@ async def get_dashboard_metrics(session: AsyncSession) -> DashboardResponse:
         await session.scalar(
             select(func.count()).select_from(Document).where(
                 Document.status.in_(completed_statuses),
-                Document.updated_at >= start_of_today,
+                Document.workflow_completed_at >= start_of_today,
             )
         )
         or 0
@@ -51,11 +51,16 @@ async def get_dashboard_metrics(session: AsyncSession) -> DashboardResponse:
     )
 
     duration_minutes = (
-        func.julianday(Document.updated_at) - func.julianday(Document.created_at)
+        func.julianday(Document.workflow_completed_at)
+        - func.julianday(Document.workflow_started_at)
     ) * 24 * 60
     average_processing_minutes = float(
         await session.scalar(
-            select(func.avg(duration_minutes)).where(Document.status.in_(completed_statuses))
+            select(func.avg(duration_minutes)).where(
+                Document.status.in_(completed_statuses),
+                Document.workflow_started_at.is_not(None),
+                Document.workflow_completed_at.is_not(None),
+            )
         )
         or 0
     )

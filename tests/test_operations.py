@@ -12,6 +12,7 @@ from app.routers import dashboard as dashboard_router
 from app.routers import documents as documents_router
 from app.routers import notifications as notifications_router
 from app.services.ai.schemas import ClinicalSummary, PatientProfile, ReportAnalysis
+from app.services.analytics import get_dashboard_metrics
 from app.services.notifications import ensure_overdue_notifications
 from app.services import workflow as workflow_service
 
@@ -186,18 +187,39 @@ async def _test_operations_require_authentication(tmp_path):
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app), base_url="http://test"
         ) as client:
-            requests = [
+            api_requests = [
+                client.get("/api/display"),
+                client.get("/api/display/1"),
+                client.get("/api/documents/1/pdf"),
+                client.get("/api/documents/1/download"),
+                client.get("/api/documents/1/workflow-events"),
                 client.get("/api/reviewers"),
                 client.get("/api/dashboard"),
                 client.get("/api/notifications"),
+                client.post(
+                    "/api/upload",
+                    files={"file": ("report.pdf", b"%PDF-1.4")},
+                ),
+                client.post("/api/summarise/1"),
+                client.patch("/api/edit/1", json={"summary": "probe"}),
+                client.post("/api/submit/1"),
+                client.delete("/api/documents/1"),
                 client.post(
                     "/api/documents/bulk",
                     json={"document_ids": [1], "action": "mark_reviewed"},
                 ),
                 client.post("/api/documents/export", json={"document_ids": [1]}),
             ]
-            responses = await asyncio.gather(*requests)
-            assert all(response.status_code == 401 for response in responses)
+            page_requests = [
+                client.get("/documents"),
+                client.get("/upload"),
+                client.get("/dashboard"),
+            ]
+            api_responses, page_responses = await asyncio.gather(
+                asyncio.gather(*api_requests), asyncio.gather(*page_requests)
+            )
+            assert all(response.status_code == 401 for response in api_responses)
+            assert all(response.status_code == 303 for response in page_responses)
     finally:
         app.dependency_overrides.clear()
         await engine.dispose()
@@ -281,5 +303,37 @@ async def _test_workflow_events_and_overdue_notifications(tmp_path, monkeypatch)
                 )
             ).scalars().all()
             assert len(overdue_notifications) == 1
+    finally:
+        await engine.dispose()
+
+
+def test_dashboard_processing_time_ignores_review_delay(tmp_path):
+    asyncio.run(_test_dashboard_processing_time_ignores_review_delay(tmp_path))
+
+
+async def _test_dashboard_processing_time_ignores_review_delay(tmp_path):
+    engine, session_factory = await _create_test_session_factory(tmp_path / "metrics.db")
+    workflow_started = utc_now() - timedelta(minutes=7)
+    workflow_completed = workflow_started + timedelta(minutes=2)
+
+    try:
+        async with session_factory() as session:
+            session.add(
+                Document(
+                    file_name="review-delay.pdf",
+                    stored_file_path=str(tmp_path / "review-delay.pdf"),
+                    file_size=100,
+                    status=DocumentStatus.HITL_COMPLETED.value,
+                    workflow_started_at=workflow_started,
+                    workflow_completed_at=workflow_completed,
+                    updated_at=workflow_completed + timedelta(hours=12),
+                )
+            )
+            await session.commit()
+
+            metrics = await get_dashboard_metrics(session)
+
+        assert metrics.average_processing_minutes == 2.0
+        assert metrics.processed_today == 1
     finally:
         await engine.dispose()

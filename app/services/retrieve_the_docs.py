@@ -37,13 +37,16 @@ def retrieve_the_docs(
     citations: list[GuidelineCitation] = []
     for excerpt, metadata, distance in zip(documents, metadatas, distances):
         metadata = metadata or {}
+        score = round(1.0 - float(distance), 4)
+        if score < settings.min_relevance_score:
+            continue
         citations.append(
             GuidelineCitation(
                 title=str(metadata.get("title", "Untitled guideline")),
                 source=str(metadata.get("source", "Neuron guideline library")),
                 section=str(metadata.get("section", "")),
                 excerpt=excerpt or "",
-                score=round(1.0 - float(distance), 4),
+                score=score,
             )
         )
     return citations

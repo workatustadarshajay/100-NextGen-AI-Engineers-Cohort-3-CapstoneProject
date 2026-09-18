@@ -152,13 +152,15 @@ def retrieve_guidelines(state: ClinicalWorkflowState) -> dict:
     )
 
 
-def summarise(state: ClinicalWorkflowState) -> dict:
+def _summarise_for_route(state: ClinicalWorkflowState, review_route: str) -> dict:
     return _run_stage(
         "summarise",
         state,
         lambda: {
             "summary": summarise_and_generate_test(
-                state["analysis"], state.get("citations", [])
+                state["analysis"],
+                state.get("citations", []),
+                review_route=review_route,
             ),
             "agent_events": ["summary"],
         },
@@ -166,12 +168,18 @@ def summarise(state: ClinicalWorkflowState) -> dict:
     )
 
 
+def summarise(state: ClinicalWorkflowState) -> dict:
+    return _summarise_for_route(
+        state, state.get("review_route", "standard_review")
+    )
+
+
 def summarise_urgent(state: ClinicalWorkflowState) -> dict:
-    return summarise(state)
+    return _summarise_for_route(state, "urgent_review")
 
 
 def summarise_standard(state: ClinicalWorkflowState) -> dict:
-    return summarise(state)
+    return _summarise_for_route(state, "standard_review")
 
 
 def recommend(state: ClinicalWorkflowState) -> dict:
