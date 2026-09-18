@@ -27,7 +27,7 @@ def _login_redirect() -> RedirectResponse:
 
 @router.get("/", include_in_schema=False)
 async def home() -> RedirectResponse:
-    return RedirectResponse(url="/documents", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.get("/upload", response_class=HTMLResponse, response_model=None, include_in_schema=False)

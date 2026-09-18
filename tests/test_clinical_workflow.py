@@ -93,6 +93,28 @@ def test_graph_runs_agents_in_sequence(monkeypatch):
     assert state["failure"] is None
     assert len(state["citations"]) == 1
     assert state["recommendations"][0].priority == "immediate"
+    assert state["review_route"] == "urgent_review"
+    assert {event["stage"] for event in state["workflow_events"]} >= {
+        "analyze_report",
+        "retrieve_guidelines",
+        "route_review",
+        "prepare_urgent_review",
+        "summarise",
+        "recommend",
+    }
+
+
+def test_graph_routes_noncritical_findings_to_standard_lane(monkeypatch):
+    _stub_agents(monkeypatch, _analysis(flag="high"))
+
+    state = asyncio.run(graph_module.run_clinical_workflow(3, "report.pdf"))
+
+    assert state["failure"] is None
+    assert state["review_route"] == "standard_review"
+    assert any(
+        event["stage"] == "prepare_standard_review"
+        for event in state["workflow_events"]
+    )
 
 
 def test_graph_error_handler_records_failure_without_crashing(monkeypatch):
@@ -148,6 +170,9 @@ def _run_workflow_against_temp_db(tmp_path, monkeypatch, analysis):
                 document.recommendations,
                 document.reference_docs,
                 document.error_message,
+                document.workflow_stage,
+                document.workflow_events,
+                document.workflow_attempts,
             )
         await engine.dispose()
         return payload, kinds
@@ -157,7 +182,18 @@ def _run_workflow_against_temp_db(tmp_path, monkeypatch, analysis):
 
 def test_workflow_persists_structured_agent_output(tmp_path, monkeypatch):
     payload, kinds = _run_workflow_against_temp_db(tmp_path, monkeypatch, _analysis())
-    status, summary, patient, findings, recommendations, citations, error = payload
+    (
+        status,
+        summary,
+        patient,
+        findings,
+        recommendations,
+        citations,
+        error,
+        workflow_stage,
+        workflow_events,
+        workflow_attempts,
+    ) = payload
 
     assert status == DocumentStatus.WORKFLOW_COMPLETED.value
     assert error is None
@@ -167,6 +203,10 @@ def test_workflow_persists_structured_agent_output(tmp_path, monkeypatch):
     assert findings[0]["flag"] == "critical"
     assert recommendations[0]["priority"] == "immediate"
     assert citations[0]["title"] == "Anaemia Investigation Pathway"
+    assert workflow_stage == "completed"
+    assert workflow_attempts == 1
+    assert workflow_events[-1]["event"] == "completed"
+    assert any(event["stage"] == "retrieve_guidelines" for event in workflow_events)
     assert "processing_completed" in kinds
     assert "critical_finding" in kinds
 

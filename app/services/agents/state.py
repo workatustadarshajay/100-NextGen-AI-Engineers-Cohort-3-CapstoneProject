@@ -1,5 +1,5 @@
 from operator import add
-from typing import Annotated, TypedDict
+from typing import Any, Annotated, TypedDict
 
 from app.services.ai.schemas import (
     ClinicalSummary,
@@ -22,4 +22,6 @@ class ClinicalWorkflowState(TypedDict, total=False):
     summary: ClinicalSummary | None
     recommendations: list[Recommendation]
     agent_events: Annotated[list[str], add]
+    workflow_events: Annotated[list[dict[str, Any]], add]
+    review_route: str
     failure: str | None

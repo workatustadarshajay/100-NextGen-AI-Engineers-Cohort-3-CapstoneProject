@@ -4,7 +4,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Document, DocumentAssignment, DocumentStatus, User
-from app.schemas import DashboardResponse, ReviewerWorkload
+from app.schemas import DashboardResponse, ReviewerWorkload, WorkflowEvent, WorkflowMonitorItem
 
 
 async def get_dashboard_metrics(session: AsyncSession) -> DashboardResponse:
@@ -89,6 +89,32 @@ async def get_dashboard_metrics(session: AsyncSession) -> DashboardResponse:
         for email, assigned_count, pending_count in reviewer_result.all()
     ]
 
+    monitor_result = await session.execute(
+        select(Document)
+        .order_by(Document.updated_at.desc(), Document.id.desc())
+        .limit(8)
+    )
+    workflow_monitor = []
+    for document in monitor_result.scalars().all():
+        last_event = None
+        if document.workflow_events:
+            try:
+                last_event = WorkflowEvent.model_validate(document.workflow_events[-1])
+            except (TypeError, ValueError):
+                last_event = None
+        workflow_monitor.append(
+            WorkflowMonitorItem(
+                id=document.id,
+                file_name=document.file_name,
+                status=document.status,
+                workflow_stage=document.workflow_stage,
+                workflow_attempts=document.workflow_attempts or 0,
+                modified=document.updated_at,
+                error_message=document.error_message,
+                last_event=last_event,
+            )
+        )
+
     return DashboardResponse(
         processed_today=processed_today,
         average_processing_minutes=round(average_processing_minutes, 1),
@@ -99,4 +125,5 @@ async def get_dashboard_metrics(session: AsyncSession) -> DashboardResponse:
         outstanding_documents=max(total_documents - completed_documents, 0),
         status_counts=status_counts,
         reviewer_workloads=reviewer_workloads,
+        workflow_monitor=workflow_monitor,
     )

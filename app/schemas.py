@@ -12,6 +12,16 @@ class DocumentStatus(str, Enum):
     FAILED = "failed"
 
 
+class WorkflowEvent(BaseModel):
+    timestamp: datetime
+    stage: str
+    event: str
+    duration_ms: float | None = None
+    attempt: int | None = None
+    message: str | None = None
+    error_type: str | None = None
+
+
 class DocumentListItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -20,6 +30,8 @@ class DocumentListItem(BaseModel):
     status: DocumentStatus
     date_received: datetime
     modified: datetime
+    workflow_stage: str | None = None
+    workflow_attempts: int = 0
 
 
 class DocumentPageResponse(BaseModel):
@@ -41,6 +53,26 @@ class DocumentDetailResponse(DocumentListItem):
     abnormal_findings: list[dict] = Field(default_factory=list)
     recommendations: list[dict] = Field(default_factory=list)
     citations: list[dict] = Field(default_factory=list)
+    workflow_events: list[WorkflowEvent] = Field(default_factory=list)
+
+
+class WorkflowMonitorItem(BaseModel):
+    id: int
+    file_name: str
+    status: DocumentStatus
+    workflow_stage: str | None = None
+    workflow_attempts: int = 0
+    modified: datetime
+    error_message: str | None = None
+    last_event: WorkflowEvent | None = None
+
+
+class WorkflowEventsResponse(BaseModel):
+    id: int
+    status: DocumentStatus
+    workflow_stage: str | None = None
+    workflow_attempts: int = 0
+    events: list[WorkflowEvent] = Field(default_factory=list)
 
 
 class UploadResponse(BaseModel):
@@ -106,6 +138,7 @@ class DashboardResponse(BaseModel):
     outstanding_documents: int
     status_counts: dict[str, int]
     reviewer_workloads: list[ReviewerWorkload]
+    workflow_monitor: list[WorkflowMonitorItem] = Field(default_factory=list)
 
 
 class EditDocumentRequest(BaseModel):

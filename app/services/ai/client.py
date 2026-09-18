@@ -19,6 +19,31 @@ class GeminiResponseError(RuntimeError):
     """Raised when the model returns output that does not match the requested schema."""
 
 
+class GeminiQuotaError(RuntimeError):
+    """Raised when the configured Gemini project has exhausted its quota."""
+
+
+def _is_quota_error(error: BaseException) -> bool:
+    status_code = getattr(error, "status_code", None)
+    error_code = getattr(error, "code", None)
+    if status_code == 429 or error_code == 429:
+        return True
+    message = str(error).lower()
+    return any(
+        marker in message
+        for marker in ("quota exceeded", "resource_exhausted", "too_many_requests")
+    )
+
+
+def _quota_error(operation: str, model: str, error: BaseException) -> GeminiQuotaError:
+    message = (
+        f"Gemini quota is exhausted while {operation} with {model}. "
+        "Wait for the project quota window to reset or enable billing/use a project "
+        "with available quota."
+    )
+    return GeminiQuotaError(message)
+
+
 @lru_cache(maxsize=1)
 def get_client() -> genai.Client:
     settings = get_ai_settings()
@@ -40,17 +65,22 @@ def generate_structured(
     """Call Gemini and parse the reply into the given Pydantic schema."""
     settings = get_ai_settings()
     active_client = client or get_client()
-    interaction = active_client.interactions.create(
-        model=settings.model,
-        input=prompt,
-        system_instruction=system_instruction,
-        response_format={
-            "type": "text",
-            "mime_type": "application/json",
-            "schema": schema.model_json_schema(),
-        },
-        timeout=settings.request_timeout,
-    )
+    try:
+        interaction = active_client.interactions.create(
+            model=settings.model,
+            input=prompt,
+            system_instruction=system_instruction,
+            response_format={
+                "type": "text",
+                "mime_type": "application/json",
+                "schema": schema.model_json_schema(),
+            },
+            timeout=settings.request_timeout,
+        )
+    except Exception as error:
+        if _is_quota_error(error):
+            raise _quota_error("structured generation", settings.model, error) from error
+        raise
 
     output_text = interaction.output_text
     if not output_text:
@@ -72,9 +102,14 @@ def embed_texts(
         return []
     settings = get_ai_settings()
     active_client = client or get_client()
-    result = active_client.models.embed_content(
-        model=settings.embedding_model,
-        contents=texts,
-        config=types.EmbedContentConfig(task_type=task_type),
-    )
+    try:
+        result = active_client.models.embed_content(
+            model=settings.embedding_model,
+            contents=texts,
+            config=types.EmbedContentConfig(task_type=task_type),
+        )
+    except Exception as error:
+        if _is_quota_error(error):
+            raise _quota_error("embedding generation", settings.embedding_model, error) from error
+        raise
     return [list(embedding.values) for embedding in result.embeddings]

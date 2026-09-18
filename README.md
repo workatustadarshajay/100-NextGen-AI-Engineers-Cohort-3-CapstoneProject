@@ -1,8 +1,8 @@
 # Neuron Clinical Document Workflow
 
 An AI clinical report summarization assistant. FastAPI, SQLite, and vanilla JavaScript drive a
-human-in-the-loop review workflow, powered by a sequential LangGraph agent pipeline that runs on
-Gemini and is grounded by retrieval over a medical guideline corpus.
+human-in-the-loop review workflow, powered by a LangGraph agent pipeline with sequential stages,
+parallel routing, and retrieval over a medical guideline corpus.
 
 > AI-generated clinical decision support. Not a diagnosis. A qualified clinician reviews and signs
 > off every document.
@@ -10,7 +10,13 @@ Gemini and is grounded by retrieval over a medical guideline corpus.
 ## Agent architecture
 
 ```
-upload PDF -> [Report Analysis Agent] -> [Guideline RAG] -> [Summary Agent] -> [Recommendation Agent] -> human review
+upload PDF -> [Report Analysis Agent]
+                    |\
+                    | +--> [Risk Router] -> [Urgent Review Lane]
+                    |                    \-> [Standard Review Lane]
+                    +----> [Guideline RAG]
+                              \            /
+                               +-- [Summary Agent] -> [Recommendation Agent] -> human review
 ```
 
 | Stage | Module | Output |
@@ -19,11 +25,18 @@ upload PDF -> [Report Analysis Agent] -> [Guideline RAG] -> [Summary Agent] -> [
 | Guideline RAG | `app/services/retrieve_the_docs.py` | `GuidelineCitation` list from ChromaDB |
 | Summary Agent | `app/services/summarise_and_generate_test.py` | `ClinicalSummary` |
 | Recommendation Agent | `app/services/recommend_follow_ups.py` | Prioritised `Recommendation` list |
-| Orchestration | `app/services/agents/graph.py` | Sequential `StateGraph` with retries and an error handler |
+| Orchestration | `app/services/agents/graph.py` | Sequential `StateGraph` with parallel fan-out, risk routing, bounded retries, and an error handler |
 
-Each node carries a `RetryPolicy`; permanent faults (missing API key, unreadable PDF) are not
-retried. When a node exhausts its retries the graph's `error_handler` records the failure and the
-document is marked `failed` rather than crashing the request.
+The analysis stage fans out to guideline retrieval and a risk router. The router selects an urgent
+or standard review lane, and an explicit fan-in barrier prevents summary generation until both the
+retrieval and selected lane complete. Each node carries a bounded `RetryPolicy`; permanent faults
+(missing API key, unreadable PDF, invalid model output, and quota exhaustion) are not retried. When
+a node exhausts its retries the graph's `error_handler` records the failure and the document is
+marked `failed` rather than crashing the request.
+
+Every workflow writes structured JSON logs to the console and rotating `data/logs/neuron.log`.
+Document records also retain stage, attempt count, timestamps, safe error text, and event timings.
+The live dashboard polls `/api/dashboard` and displays the current agent stage while processing.
 
 ## Run locally
 
@@ -43,6 +56,10 @@ Open `http://127.0.0.1:8000`. The API documentation is available at `http://127.
 
 `GEMINI_API_KEY` is required. Without it an upload is marked `failed` with an explanatory message.
 Keys are read from the environment or `.env` only, and `.env` is gitignored.
+The default model is `gemini-3.8-flash`. A Gemini `429` quota error means the configured project
+has exhausted its available request quota; the workflow does not retry that exhausted quota. Wait
+for the quota window to reset, or enable billing/use a project with available quota. Changing the
+model only helps when the selected model has separate available quota.
 
 ## Synthetic data and the guideline index
 
@@ -53,8 +70,8 @@ Keys are read from the environment or `.env` only, and `.env` is gitignored.
 
 ## Workflow
 
-1. Upload a PDF from `/upload`. The record is stored as `summarising` and the agent graph runs in the background.
-2. The inbox at `/documents` polls the display API until the record becomes `workflowcompleted`.
+1. Upload a PDF from `/upload`. The record is stored as `summarising`, the user returns to `/dashboard`, and the agent graph runs in the background.
+2. The dashboard monitor polls `/api/dashboard` until the record becomes `workflowcompleted` or `failed`.
 3. Search by filename or filter by status to focus the inbox on a working queue.
 4. Retry a failed document from the inbox to send it through the workflow again.
 5. Open a workflow-complete row to review the generated summary, abnormal findings, follow-up
@@ -80,6 +97,7 @@ Keys are read from the environment or `.env` only, and `.env` is gitignored.
 - `POST /api/documents/export` downloads selected document records as CSV, including abnormal counts and top priority.
 - `GET /api/reviewers` lists users available for assignment.
 - `GET /api/dashboard` returns operational metrics and reviewer workloads.
+- `GET /api/documents/{document_id}/workflow-events` returns authenticated stage timings and failure events.
 - `GET /api/notifications` lists recent notifications and the unread count.
 - `POST /api/notifications/{notification_id}/read` marks one notification read.
 - `POST /api/notifications/read-all` marks all visible notifications read.

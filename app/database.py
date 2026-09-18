@@ -21,8 +21,15 @@ class Base(DeclarativeBase):
     """Base class for SQLAlchemy models."""
 
 
-# create_all never alters an existing table, so agent columns are added separately.
-AGENT_DOCUMENT_COLUMNS = ("abnormal_findings", "recommendations")
+DOCUMENT_MIGRATION_COLUMNS = {
+    "abnormal_findings": "JSON",
+    "recommendations": "JSON",
+    "workflow_stage": "VARCHAR(64)",
+    "workflow_events": "JSON",
+    "workflow_attempts": "INTEGER NOT NULL DEFAULT 0",
+    "workflow_started_at": "DATETIME",
+    "workflow_completed_at": "DATETIME",
+}
 
 
 def _missing_document_columns(sync_connection) -> list[str]:
@@ -30,7 +37,7 @@ def _missing_document_columns(sync_connection) -> list[str]:
     if "documents" not in inspector.get_table_names():
         return []
     existing = {column["name"] for column in inspector.get_columns("documents")}
-    return [name for name in AGENT_DOCUMENT_COLUMNS if name not in existing]
+    return [name for name in DOCUMENT_MIGRATION_COLUMNS if name not in existing]
 
 
 engine = create_async_engine(DATABASE_URL, echo=False)
@@ -45,7 +52,10 @@ async def init_db() -> None:
         await connection.run_sync(Base.metadata.create_all)
         for column_name in await connection.run_sync(_missing_document_columns):
             await connection.execute(
-                text(f"ALTER TABLE documents ADD COLUMN {column_name} JSON")
+                text(
+                    "ALTER TABLE documents ADD COLUMN "
+                    f"{column_name} {DOCUMENT_MIGRATION_COLUMNS[column_name]}"
+                )
             )
 
 

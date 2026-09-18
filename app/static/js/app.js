@@ -6,6 +6,30 @@
         hitlcompleted: "HITL completed",
         failed: "Needs attention",
     };
+    const workflowStageLabels = {
+        starting: "Queued for processing",
+        analyze_report: "Extracting report context",
+        retrieve_guidelines: "Retrieving guideline references",
+        route_review: "Routing clinical review",
+        prepare_urgent_review: "Prioritising urgent review",
+        prepare_standard_review: "Preparing standard review",
+        summarise: "Writing clinician summary",
+        recommend: "Preparing follow-up recommendations",
+        completed: "Ready for human review",
+        failed: "Workflow stopped",
+    };
+    const workflowStageProgress = {
+        starting: 8,
+        analyze_report: 22,
+        retrieve_guidelines: 45,
+        route_review: 60,
+        prepare_urgent_review: 68,
+        prepare_standard_review: 68,
+        summarise: 82,
+        recommend: 94,
+        completed: 100,
+        failed: 100,
+    };
 
     const escapeHtml = (value) => String(value)
         .replaceAll("&", "&amp;")
@@ -62,6 +86,110 @@
             button.textContent = button.dataset.originalLabel || button.textContent;
         }
         refreshIcons();
+    };
+
+    const initDashboard = () => {
+        const page = document.querySelector("[data-page=dashboard]");
+        if (!page) {
+            return;
+        }
+
+        const notice = page.querySelector("[data-dashboard-notice]");
+        const monitorBody = page.querySelector("[data-workflow-monitor-body]");
+        const liveCount = page.querySelector("[data-workflow-live-count]");
+        const newDocumentId = new URLSearchParams(window.location.search).get("new");
+        let refreshTimer;
+
+        if (newDocumentId) {
+            setNotice(notice, "Your PDF is queued. Agent progress will appear below while it is processed.", "success");
+        }
+
+        const renderMonitor = (items) => {
+            const processingItems = items.filter((item) => item.status === "summarising");
+            if (liveCount) {
+                liveCount.textContent = processingItems.length;
+            }
+            if (!monitorBody) {
+                return;
+            }
+            if (!items.length) {
+                monitorBody.innerHTML = '<div class="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">No workflow activity yet.</div>';
+                return;
+            }
+            monitorBody.innerHTML = items.map((item) => {
+                const stage = item.workflow_stage || (item.status === "summarising" ? "starting" : "completed");
+                const stageLabel = workflowStageLabels[stage] || stage.replaceAll("_", " ");
+                const progress = workflowStageProgress[stage] || (item.status === "failed" ? 100 : 12);
+                const progressColor = item.status === "failed" ? "bg-coral" : "bg-signal";
+                const eventLabel = item.last_event?.event
+                    ? item.last_event.event.replaceAll("_", " ")
+                    : "queued";
+                const errorMarkup = item.error_message
+                    ? `<p class="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs leading-5 text-rose-700">${escapeHtml(item.error_message)}</p>`
+                    : "";
+                return `
+                    <article class="rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-4" data-workflow-id="${item.id}">
+                        <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-semibold text-ink">${escapeHtml(item.file_name)}</p>
+                                <p class="mt-1 text-xs font-semibold text-slate-500">${escapeHtml(stageLabel)}</p>
+                            </div>
+                            <div class="flex shrink-0 items-center gap-2">
+                                ${statusMarkup(item.status)}
+                                <span class="text-[11px] font-semibold text-slate-400">Attempt ${escapeHtml(item.workflow_attempts || 0)}</span>
+                            </div>
+                        </div>
+                        <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200">
+                            <div class="h-full rounded-full ${progressColor} transition-[width] duration-500" style="width: ${progress}%"></div>
+                        </div>
+                        <div class="mt-2 flex flex-wrap justify-between gap-2 text-[11px] font-semibold text-slate-400">
+                            <span>Last event: ${escapeHtml(eventLabel)}</span>
+                            <span>${escapeHtml(formatDate(item.modified))}</span>
+                        </div>
+                        ${errorMarkup}
+                    </article>
+                `;
+            }).join("");
+            refreshIcons();
+        };
+
+        const refreshDashboard = async () => {
+            try {
+                const response = await fetch("/api/dashboard", { headers: { Accept: "application/json" } });
+                if (!response.ok) {
+                    throw new Error("The workflow monitor is temporarily unavailable.");
+                }
+                const payload = await response.json();
+                const values = {
+                    processed_today: payload.processed_today,
+                    average_processing_minutes: payload.average_processing_minutes,
+                    pending_reviews: payload.pending_reviews,
+                    failed_workflows: payload.failed_workflows,
+                };
+                Object.entries(values).forEach(([key, value]) => {
+                    const target = page.querySelector(`[data-dashboard-stat=${key}]`);
+                    if (!target) {
+                        return;
+                    }
+                    if (key === "average_processing_minutes") {
+                        target.innerHTML = `${escapeHtml(value)}<span class="ml-1 text-sm font-semibold tracking-normal text-slate-400">min</span>`;
+                    } else {
+                        target.textContent = value;
+                    }
+                });
+                const items = payload.workflow_monitor || [];
+                renderMonitor(items);
+                const hasProcessing = items.some((item) => item.status === "summarising");
+                window.clearTimeout(refreshTimer);
+                refreshTimer = window.setTimeout(refreshDashboard, hasProcessing ? 1800 : 10000);
+            } catch (error) {
+                setNotice(notice, error.message, "error");
+                window.clearTimeout(refreshTimer);
+                refreshTimer = window.setTimeout(refreshDashboard, 5000);
+            }
+        };
+
+        refreshDashboard();
     };
 
     const initUploadPage = () => {
@@ -134,7 +262,7 @@
                 if (!response.ok) {
                     throw new Error(payload.detail || "Upload failed");
                 }
-                window.location.assign(`/documents?new=${payload.document.id}`);
+                window.location.assign(`/dashboard?new=${payload.document.id}`);
             } catch (error) {
                 setNotice(notice, error.message, "error");
                 setBusy(submitButton, false);
@@ -813,6 +941,7 @@
 
     document.addEventListener("DOMContentLoaded", () => {
         refreshIcons();
+        initDashboard();
         initUploadPage();
         initDocumentsPage();
         initDetailPage();

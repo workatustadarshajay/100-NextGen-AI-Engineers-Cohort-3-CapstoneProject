@@ -9,6 +9,7 @@ __pycache__/
 .env
 data/*.db
 data/chroma/
+data/logs/
 data/synthetic/
 data/uploads/*
 !data/uploads/.gitkeep

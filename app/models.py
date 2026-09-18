@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from enum import Enum
+from typing import Any
 
 from sqlalchemy import DateTime, ForeignKey, Index, JSON, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -47,6 +48,11 @@ class Document(Base):
     abnormal_findings: Mapped[list[dict[str, str]] | None] = mapped_column(JSON, nullable=True)
     recommendations: Mapped[list[dict[str, str]] | None] = mapped_column(JSON, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    workflow_stage: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    workflow_events: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
+    workflow_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    workflow_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    workflow_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now

@@ -8,11 +8,15 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.database import engine, init_db
+from app.observability import configure_logging
 from app.routers.auth import router as auth_router
 from app.routers.dashboard import router as dashboard_router
 from app.routers.documents import router as documents_router
 from app.routers.notifications import router as notifications_router
 from app.routers.pages import router as pages_router
+
+
+configure_logging()
 
 
 @asynccontextmanager

@@ -26,6 +26,7 @@ from app.schemas import (
     EditDocumentRequest,
     ReviewerResponse,
     UploadResponse,
+    WorkflowEventsResponse,
 )
 from app.services.workflow import run_workflow
 from app.services.notifications import add_notification
@@ -71,6 +72,8 @@ def _serialize_list_item(document: Document) -> DocumentListItem:
         status=DocumentStatusSchema(document.status),
         date_received=document.created_at,
         modified=document.updated_at,
+        workflow_stage=document.workflow_stage,
+        workflow_attempts=document.workflow_attempts or 0,
     )
 
 
@@ -81,6 +84,8 @@ def _serialize_detail(document: Document) -> DocumentDetailResponse:
         status=DocumentStatusSchema(document.status),
         date_received=document.created_at,
         modified=document.updated_at,
+        workflow_stage=document.workflow_stage,
+        workflow_attempts=document.workflow_attempts or 0,
         summary=document.summary,
         can_edit=document.status == DocumentStatus.WORKFLOW_COMPLETED.value,
         can_view=document.status in VIEWABLE_STATUSES,
@@ -90,6 +95,7 @@ def _serialize_detail(document: Document) -> DocumentDetailResponse:
         abnormal_findings=document.abnormal_findings or [],
         recommendations=document.recommendations or [],
         citations=document.reference_docs or [],
+        workflow_events=document.workflow_events or [],
     )
 
 
@@ -460,6 +466,24 @@ async def display_document(document_id: int, session: SessionDep) -> DocumentDet
             detail="This document is not ready to view",
         )
     return _serialize_detail(document)
+
+
+@router.get("/documents/{document_id}/workflow-events", response_model=WorkflowEventsResponse)
+async def display_workflow_events(
+    document_id: int,
+    request: Request,
+    session: SessionDep,
+) -> WorkflowEventsResponse:
+    """Return stage timings and failure details for an authenticated reviewer."""
+    await _get_authenticated_user(request, session)
+    document = await _get_document(session, document_id)
+    return WorkflowEventsResponse(
+        id=document.id,
+        status=DocumentStatusSchema(document.status),
+        workflow_stage=document.workflow_stage,
+        workflow_attempts=document.workflow_attempts or 0,
+        events=document.workflow_events or [],
+    )
 
 
 @router.post("/summarise/{document_id}", response_model=DocumentListItem)
