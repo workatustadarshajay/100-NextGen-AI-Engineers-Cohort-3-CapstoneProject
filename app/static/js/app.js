@@ -792,6 +792,20 @@
 
         const setRecommendationFeedback = (item, decision) => {
             item.dataset.feedbackDecision = decision;
+            item.querySelectorAll("[data-feedback-action]").forEach((button) => {
+                const action = button.dataset.feedbackAction;
+                const selected = action === decision;
+                const label = button.querySelector("span");
+                if (label) {
+                    label.textContent = selected
+                        ? (action === "accepted" ? "Accepted" : "Rejected")
+                        : (action === "accepted" ? "Accept" : "Reject");
+                }
+                button.setAttribute("aria-pressed", String(selected));
+                button.title = selected
+                    ? `${action === "accepted" ? "Accepted" : "Rejected"} recommendation`
+                    : `${action === "accepted" ? "Accept" : "Reject"} recommendation`;
+            });
             const status = item.querySelector("[data-feedback-status]");
             if (status) {
                 status.textContent = feedbackDecisionLabel(decision);

@@ -70,6 +70,11 @@ are safe to remove afterwards. A liveness probe is exposed at `GET /health`.
 
 `GEMINI_API_KEY` is required. Without it an upload is marked `failed` with an explanatory message.
 Keys are read from the environment or `.env` only, and `.env` is gitignored.
+Set `TRUSTED_SEARCH_ENABLED=1` to enable the opt-in fallback search over guideline-like records in
+Europe PMC/PubMed when the local Chroma corpus has no sufficiently relevant match. The search is
+restricted to the allowlisted Europe PMC endpoint, sends only the clinical concern and finding
+names, and stores the source URL, publication date, and age label for reviewer inspection. A source
+age label is review metadata, not a claim that older guidance is invalid.
 The default model is `gemini-3.8-flash`. A Gemini `429` quota error means the configured project
 has exhausted its available request quota; the workflow does not retry that exhausted quota. Wait
 for the quota window to reset, or enable billing/use a project with available quota. Changing the

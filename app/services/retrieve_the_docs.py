@@ -2,6 +2,7 @@ from app.config import get_ai_settings
 from app.services.ai.client import embed_texts
 from app.services.ai.schemas import GuidelineCitation
 from app.services.rag.store import get_collection
+from app.services.trusted_guideline_search import search_trusted_guidelines
 
 
 def retrieve_the_docs(
@@ -10,6 +11,7 @@ def retrieve_the_docs(
     *,
     collection=None,
     client=None,
+    trusted_search=None,
 ) -> list[GuidelineCitation]:
     """Return the guideline excerpts most relevant to the analysed report."""
     cleaned_query = (query or "").strip()
@@ -20,7 +22,10 @@ def retrieve_the_docs(
     active_collection = collection if collection is not None else get_collection()
     available = active_collection.count()
     if available == 0:
-        return []
+        if not settings.trusted_search_enabled:
+            return []
+        search = trusted_search or search_trusted_guidelines
+        return search(cleaned_query, limit=settings.trusted_search_limit)
 
     limit = min(top_k or settings.top_k, available)
     [query_embedding] = embed_texts(
@@ -49,4 +54,9 @@ def retrieve_the_docs(
                 score=score,
             )
         )
-    return citations
+    if citations or not settings.trusted_search_enabled:
+        return citations
+    return (trusted_search or search_trusted_guidelines)(
+        cleaned_query,
+        limit=settings.trusted_search_limit,
+    )

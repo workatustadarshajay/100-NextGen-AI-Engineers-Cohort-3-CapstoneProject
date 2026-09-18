@@ -194,13 +194,13 @@
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <span data-feedback-status class="text-[11px] font-bold {% if recommendation_decision == 'accepted' %}text-emerald-600{% elif recommendation_decision == 'rejected' %}text-rose-600{% else %}text-slate-400{% endif %}">{% if recommendation_decision == 'accepted' %}Accepted{% elif recommendation_decision == 'rejected' %}Rejected{% else %}Not reviewed{% endif %}</span>
                         <div class="flex flex-wrap gap-2">
-                            <button type="button" data-feedback-action="accepted" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-emerald-100 bg-emerald-50 px-3 text-[11px] font-bold text-emerald-700 transition hover:border-emerald-200 hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:opacity-40" {% if not is_editable %}disabled{% endif %} title="Accept recommendation">
+                            <button type="button" data-feedback-action="accepted" aria-pressed="{{ 'true' if recommendation_decision == 'accepted' else 'false' }}" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-emerald-100 bg-emerald-50 px-3 text-[11px] font-bold text-emerald-700 transition hover:border-emerald-200 hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:opacity-40" {% if not is_editable %}disabled{% endif %} title="{{ 'Accepted recommendation' if recommendation_decision == 'accepted' else 'Accept recommendation' }}">
                                 <i data-lucide="check" class="h-3.5 w-3.5"></i>
-                                <span>Accept</span>
+                                <span>{{ 'Accepted' if recommendation_decision == 'accepted' else 'Accept' }}</span>
                             </button>
-                            <button type="button" data-feedback-action="rejected" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-rose-100 bg-rose-50 px-3 text-[11px] font-bold text-rose-700 transition hover:border-rose-200 hover:bg-rose-100 focus:outline-none focus:ring-2 focus:ring-rose-200 disabled:cursor-not-allowed disabled:opacity-40" {% if not is_editable %}disabled{% endif %} title="Reject recommendation">
+                            <button type="button" data-feedback-action="rejected" aria-pressed="{{ 'true' if recommendation_decision == 'rejected' else 'false' }}" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-rose-100 bg-rose-50 px-3 text-[11px] font-bold text-rose-700 transition hover:border-rose-200 hover:bg-rose-100 focus:outline-none focus:ring-2 focus:ring-rose-200 disabled:cursor-not-allowed disabled:opacity-40" {% if not is_editable %}disabled{% endif %} title="{{ 'Rejected recommendation' if recommendation_decision == 'rejected' else 'Reject recommendation' }}">
                                 <i data-lucide="x" class="h-3.5 w-3.5"></i>
-                                <span>Reject</span>
+                                <span>{{ 'Rejected' if recommendation_decision == 'rejected' else 'Reject' }}</span>
                             </button>
                         </div>
                     </div>
@@ -228,8 +228,17 @@
             <li id="guideline-{{ loop.index }}" class="scroll-mt-24 rounded-xl border border-slate-100 px-4 py-3">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <p class="text-sm font-semibold text-ink">{{ citation.get('title', '-') }}{% if citation.get('section') %} <span class="text-slate-400">/ {{ citation.get('section') }}</span>{% endif %}</p>
-                    <span class="text-[11px] font-bold text-slate-400">{{ citation.get('source', '') }}{% if citation.get('score') is not none %} / {{ '%.2f'|format(citation.get('score', 0)) }} relevance{% endif %}</span>
+                    <div class="flex flex-wrap items-center justify-end gap-2 text-[11px] font-bold text-slate-400">
+                        <span>{{ citation.get('source', '') }}{% if citation.get('score') is not none %} / {{ '%.2f'|format(citation.get('score', 0)) }} relevance{% endif %}</span>
+                        {% if citation.get('url') %}
+                        <a href="{{ citation.get('url') }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-signal underline decoration-cyan-200 underline-offset-2 hover:text-cyan-700" title="Open trusted source">
+                            <i data-lucide="external-link" class="h-3 w-3"></i>
+                            Source
+                        </a>
+                        {% endif %}
+                    </div>
                 </div>
+                {% if citation.get('published') %}<p class="mt-1 text-[11px] font-semibold text-slate-400">Published {{ citation.get('published') }}{% if citation.get('freshness') and citation.get('freshness') != 'unknown' %} / {{ citation.get('freshness')|capitalize }}{% endif %}</p>{% endif %}
                 <p class="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{{ citation.get('excerpt', '') }}</p>
             </li>
             {% endfor %}

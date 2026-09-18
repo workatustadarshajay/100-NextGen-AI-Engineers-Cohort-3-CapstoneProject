@@ -12,6 +12,8 @@ load_dotenv(PROJECT_ROOT / ".env")
 DEFAULT_MODEL = "gemini-3.8-flash"
 DEFAULT_EMBEDDING_MODEL = "gemini-embedding-001"
 DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile"
+DEFAULT_TRUSTED_SEARCH_LIMIT = 3
+DEFAULT_TRUSTED_SEARCH_TIMEOUT = 8.0
 
 
 @dataclass(frozen=True)
@@ -30,11 +32,21 @@ class AISettings:
     top_k: int
     min_relevance_score: float
     request_timeout: float
+    trusted_search_enabled: bool
+    trusted_search_limit: int
+    trusted_search_timeout: float
 
 
 def _resolve_path(value: str) -> Path:
     path = Path(value).expanduser()
     return path if path.is_absolute() else PROJECT_ROOT / path
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 @lru_cache(maxsize=1)
@@ -52,4 +64,11 @@ def get_ai_settings() -> AISettings:
         top_k=int(os.getenv("RAG_TOP_K", "4")),
         min_relevance_score=float(os.getenv("RAG_MIN_RELEVANCE_SCORE", "0.2")),
         request_timeout=float(os.getenv("GEMINI_TIMEOUT_SECONDS", "90")),
+        trusted_search_enabled=_env_flag("TRUSTED_SEARCH_ENABLED"),
+        trusted_search_limit=int(
+            os.getenv("TRUSTED_SEARCH_LIMIT", str(DEFAULT_TRUSTED_SEARCH_LIMIT))
+        ),
+        trusted_search_timeout=float(
+            os.getenv("TRUSTED_SEARCH_TIMEOUT", str(DEFAULT_TRUSTED_SEARCH_TIMEOUT))
+        ),
     )

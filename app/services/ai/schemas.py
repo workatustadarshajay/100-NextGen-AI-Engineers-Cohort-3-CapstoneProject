@@ -51,13 +51,16 @@ class ReportAnalysis(BaseModel):
 
 
 class GuidelineCitation(BaseModel):
-    """One retrieved chunk of the medical guideline corpus."""
+    """One retrieved local or trusted external guideline record."""
 
     title: str
     source: str
     section: str = ""
     excerpt: str = ""
     score: float = 0.0
+    url: str = ""
+    published: str = ""
+    freshness: Literal["current", "aging", "old", "unknown"] = "unknown"
 
 
 class ClinicalSummary(BaseModel):
