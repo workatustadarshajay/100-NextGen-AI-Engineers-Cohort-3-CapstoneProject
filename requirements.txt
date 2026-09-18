@@ -8,6 +8,7 @@ python-multipart>=0.0.9,<1.0
 pydantic>=2.8,<3.0
 python-dotenv>=1.0,<2.0
 google-genai>=2.3.0
+groq>=0.13,<1.0
 langgraph>=1.2.0
 chromadb>=0.5,<2.0
 pypdf>=5.0,<7.0

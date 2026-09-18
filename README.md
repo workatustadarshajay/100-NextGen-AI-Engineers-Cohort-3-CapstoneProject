@@ -45,7 +45,7 @@ python3 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
 
-cp .env.example .env        # then set GEMINI_API_KEY
+cp .env.example .env        # then set GEMINI_API_KEY and GROQ_API_KEY
 python scripts/generate_synthetic_data.py
 python scripts/ingest_guidelines.py
 
@@ -60,6 +60,10 @@ The default model is `gemini-3.8-flash`. A Gemini `429` quota error means the co
 has exhausted its available request quota; the workflow does not retry that exhausted quota. Wait
 for the quota window to reset, or enable billing/use a project with available quota. Changing the
 model only helps when the selected model has separate available quota.
+Set `GROQ_API_KEY` to enable the automatic text-generation fallback when Gemini returns HTTP 429.
+The fallback uses `llama-3.3-70b-versatile` by default and validates its JSON against the same
+Pydantic schemas. Groq replaces Gemini generation only; guideline embeddings still use the
+configured Gemini embedding model.
 
 ## Synthetic data and the guideline index
 
@@ -109,7 +113,7 @@ The local database is created at `data/documents.db`; uploaded files are stored 
 
 ## Tests
 
-The suite runs fully offline. The Gemini client is injected, so no test reaches the network.
+The suite runs fully offline. Gemini and Groq clients are injected, so no test reaches either provider.
 
 ```bash
 pytest -q tests

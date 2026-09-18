@@ -34,6 +34,8 @@ class JsonFormatter(logging.Formatter):
             "tool",
             "route",
             "error_type",
+            "provider",
+            "model",
         )
         for field_name in field_names:
             value = getattr(record, field_name, None)

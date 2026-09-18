@@ -11,6 +11,7 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 DEFAULT_MODEL = "gemini-3.8-flash"
 DEFAULT_EMBEDDING_MODEL = "gemini-embedding-001"
+DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile"
 
 
 @dataclass(frozen=True)
@@ -19,6 +20,8 @@ class AISettings:
 
     api_key: str | None
     model: str
+    groq_api_key: str | None
+    groq_model: str
     embedding_model: str
     chroma_dir: Path
     guidelines_dir: Path
@@ -38,6 +41,8 @@ def get_ai_settings() -> AISettings:
     return AISettings(
         api_key=(os.getenv("GEMINI_API_KEY") or "").strip() or None,
         model=os.getenv("GEMINI_MODEL", DEFAULT_MODEL),
+        groq_api_key=(os.getenv("GROQ_API_KEY") or "").strip() or None,
+        groq_model=os.getenv("GROQ_MODEL", DEFAULT_GROQ_MODEL),
         embedding_model=os.getenv("GEMINI_EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL),
         chroma_dir=_resolve_path(os.getenv("CHROMA_DIR", "data/chroma")),
         guidelines_dir=_resolve_path(os.getenv("GUIDELINES_DIR", "data/guidelines")),
