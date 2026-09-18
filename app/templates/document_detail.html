@@ -85,6 +85,106 @@
         </section>
     </div>
 
+    {% if document.patient_details or document.abnormal_findings or document.recommendations %}
+    <section class="surface animate-in delay-2 p-5 sm:p-7" aria-labelledby="clinical-heading">
+        <div class="flex items-start justify-between gap-4">
+            <div>
+                <p class="eyebrow">Agent output / clinical intelligence</p>
+                <h2 id="clinical-heading" class="mt-2 font-display text-xl font-bold tracking-[-0.03em] text-ink">Structured findings</h2>
+            </div>
+            <i data-lucide="activity" class="h-5 w-5 text-signal"></i>
+        </div>
+
+        {% if document.patient_details %}
+        <div class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {% for label, key in [('Patient', 'patient_name'), ('Patient ID', 'patient_id'), ('Date of birth', 'date_of_birth'), ('Encounter', 'encounter_date')] %}
+            <div class="rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3">
+                <p class="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{{ label }}</p>
+                <p class="mt-1 truncate text-sm font-semibold text-ink">{{ document.patient_details.get(key, '-') }}</p>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if document.medical_details %}
+        <div class="mt-4 rounded-xl border border-slate-100 px-4 py-3">
+            <p class="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">Presenting concern</p>
+            <p class="mt-1 text-sm text-slate-600">{{ document.medical_details.get('presenting_concern', '-') }}</p>
+        </div>
+        {% endif %}
+
+        <h3 class="mt-7 font-display text-sm font-bold text-ink">Abnormal findings</h3>
+        {% if document.abnormal_findings %}
+        <div class="mt-3 overflow-x-auto">
+            <table class="w-full min-w-[640px] border-collapse text-left">
+                <thead class="bg-slate-50/80">
+                    <tr class="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
+                        <th class="px-4 py-3">Test</th>
+                        <th class="px-4 py-3">Result</th>
+                        <th class="px-4 py-3">Reference</th>
+                        <th class="px-4 py-3">Flag</th>
+                        <th class="px-4 py-3">Interpretation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for finding in document.abnormal_findings %}
+                    <tr class="border-t border-slate-100">
+                        <td class="px-4 py-3 text-sm font-semibold text-slate-800">{{ finding.get('test_name', '-') }}</td>
+                        <td class="whitespace-nowrap px-4 py-3 text-sm text-slate-600">{{ finding.get('value', '-') }} {{ finding.get('unit', '') }}</td>
+                        <td class="whitespace-nowrap px-4 py-3 text-sm text-slate-500">{{ finding.get('reference_range', '-') }}</td>
+                        <td class="px-4 py-3"><span class="finding-flag is-{{ finding.get('flag', 'normal') }}">{{ finding.get('flag', 'normal')|upper }}</span></td>
+                        <td class="px-4 py-3 text-sm text-slate-600">{{ finding.get('interpretation', '') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="mt-3 rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500">No abnormal findings were detected in this report.</p>
+        {% endif %}
+
+        <h3 class="mt-7 font-display text-sm font-bold text-ink">Follow-up recommendations</h3>
+        {% if document.recommendations %}
+        <ul class="mt-3 space-y-3">
+            {% for item in document.recommendations %}
+            <li class="rounded-xl border border-slate-100 bg-slate-50/60 px-4 py-3">
+                <div class="flex flex-wrap items-start justify-between gap-2">
+                    <p class="text-sm font-semibold text-ink">{{ item.get('action', '-') }}</p>
+                    <span class="priority-pill is-{{ item.get('priority', 'routine') }}">{{ item.get('priority', 'routine')|upper }}</span>
+                </div>
+                <p class="mt-1 text-xs leading-5 text-slate-500">{{ item.get('rationale', '') }}</p>
+                {% if item.get('supporting_titles') %}
+                <p class="mt-2 text-[11px] font-semibold text-slate-400">Based on: {{ item.get('supporting_titles')|join(', ') }}</p>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="mt-3 rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500">No follow-up actions were generated.</p>
+        {% endif %}
+
+        {% if document.reference_docs %}
+        <h3 class="mt-7 font-display text-sm font-bold text-ink">Guideline citations</h3>
+        <ul class="mt-3 space-y-2">
+            {% for citation in document.reference_docs %}
+            <li class="rounded-xl border border-slate-100 px-4 py-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <p class="text-sm font-semibold text-ink">{{ citation.get('title', '-') }}{% if citation.get('section') %} <span class="text-slate-400">/ {{ citation.get('section') }}</span>{% endif %}</p>
+                    <span class="text-[11px] font-bold text-slate-400">{{ citation.get('source', '') }}</span>
+                </div>
+                <p class="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{{ citation.get('excerpt', '') }}</p>
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        <p class="mt-7 flex items-start gap-2 border-t border-slate-100 pt-5 text-xs leading-5 text-slate-500">
+            <i data-lucide="shield-alert" class="mt-0.5 h-4 w-4 shrink-0 text-amber"></i>
+            <span>AI-generated clinical decision support. Not a diagnosis. A qualified clinician must review and sign off every document.</span>
+        </p>
+    </section>
+    {% endif %}
+
     <div id="pdf-modal" class="fixed inset-0 z-50 hidden" role="dialog" aria-modal="true" aria-labelledby="pdf-modal-title" aria-hidden="true">
         <div data-pdf-modal-backdrop class="absolute inset-0 bg-ink/75 backdrop-blur-sm"></div>
         <section data-pdf-viewer class="relative z-10 mx-3 flex h-[calc(100vh-1.5rem)] max-h-[900px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:mx-6 sm:h-[calc(100vh-3rem)]" aria-labelledby="pdf-modal-title">

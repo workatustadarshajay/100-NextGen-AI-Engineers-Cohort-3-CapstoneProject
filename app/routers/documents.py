@@ -85,6 +85,11 @@ def _serialize_detail(document: Document) -> DocumentDetailResponse:
         can_edit=document.status == DocumentStatus.WORKFLOW_COMPLETED.value,
         can_view=document.status in VIEWABLE_STATUSES,
         error_message=document.error_message,
+        patient_details=document.patient_details,
+        medical_details=document.medical_details,
+        abnormal_findings=document.abnormal_findings or [],
+        recommendations=document.recommendations or [],
+        citations=document.reference_docs or [],
     )
 
 
@@ -318,8 +323,26 @@ async def export_documents(
     documents = result.scalars().all()
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["id", "file_name", "status", "date_received", "modified", "summary", "error"])
+    writer.writerow(
+        [
+            "id",
+            "file_name",
+            "status",
+            "date_received",
+            "modified",
+            "abnormal_findings",
+            "top_priority",
+            "summary",
+            "error",
+        ]
+    )
     for document in documents:
+        recommendations = document.recommendations or []
+        priorities = [item.get("priority", "") for item in recommendations]
+        top_priority = next(
+            (level for level in ("immediate", "urgent", "routine") if level in priorities),
+            "",
+        )
         writer.writerow(
             [
                 document.id,
@@ -327,6 +350,8 @@ async def export_documents(
                 document.status,
                 document.created_at.isoformat(),
                 document.updated_at.isoformat(),
+                len(document.abnormal_findings or []),
+                top_priority,
                 document.summary or "",
                 document.error_message or "",
             ]

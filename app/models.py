@@ -44,6 +44,8 @@ class Document(Base):
     patient_details: Mapped[dict[str, str] | None] = mapped_column(JSON, nullable=True)
     medical_details: Mapped[dict[str, str] | None] = mapped_column(JSON, nullable=True)
     reference_docs: Mapped[list[dict[str, str]] | None] = mapped_column(JSON, nullable=True)
+    abnormal_findings: Mapped[list[dict[str, str]] | None] = mapped_column(JSON, nullable=True)
+    recommendations: Mapped[list[dict[str, str]] | None] = mapped_column(JSON, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(

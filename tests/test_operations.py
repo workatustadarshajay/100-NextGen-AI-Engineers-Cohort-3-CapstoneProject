@@ -11,6 +11,7 @@ from app.models import Document, DocumentAssignment, DocumentStatus, Notificatio
 from app.routers import dashboard as dashboard_router
 from app.routers import documents as documents_router
 from app.routers import notifications as notifications_router
+from app.services.ai.schemas import ClinicalSummary, PatientProfile, ReportAnalysis
 from app.services.notifications import ensure_overdue_notifications
 from app.services import workflow as workflow_service
 
@@ -210,18 +211,30 @@ async def _test_workflow_events_and_overdue_notifications(tmp_path, monkeypatch)
     engine, session_factory = await _create_test_session_factory(tmp_path / "documents.db")
     monkeypatch.setattr(workflow_service, "async_session_factory", session_factory)
 
-    def fake_extract(_file_path):
-        return {"name": "Patient"}, {"condition": "Condition"}
+    async def fake_clinical_workflow(_document_id, _file_path):
+        return {
+            "analysis": ReportAnalysis(
+                patient=PatientProfile(
+                    patient_id="PX-1",
+                    patient_name="Patient",
+                    date_of_birth="1980-01-01",
+                    sex="Female",
+                    encounter_date="2026-01-01",
+                ),
+                presenting_concern="Condition",
+                history="History",
+                medications=[],
+                findings=[],
+            ),
+            "summary": ClinicalSummary(
+                headline="Generated summary", summary="Body", key_points=[]
+            ),
+            "citations": [],
+            "recommendations": [],
+            "failure": None,
+        }
 
-    def fake_retrieve(_medical_details):
-        return [{"title": "Reference"}]
-
-    def fake_summary(_patient_details, _medical_details, _reference_docs):
-        return "Generated summary"
-
-    monkeypatch.setattr(workflow_service, "extract_from_pdf", fake_extract)
-    monkeypatch.setattr(workflow_service, "retrieve_the_docs", fake_retrieve)
-    monkeypatch.setattr(workflow_service, "summarise_and_generate_test", fake_summary)
+    monkeypatch.setattr(workflow_service, "run_clinical_workflow", fake_clinical_workflow)
 
     try:
         async with session_factory() as session:

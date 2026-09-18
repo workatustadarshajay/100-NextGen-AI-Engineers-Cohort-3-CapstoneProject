@@ -3,17 +3,17 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import hash_password, verify_password
 from app.database import get_session
 from app.models import User
+from app.templating import create_templates
 
 
 router = APIRouter(tags=["auth"])
-templates = Jinja2Templates(directory=Path(__file__).resolve().parent.parent / "templates")
+templates = create_templates()
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 

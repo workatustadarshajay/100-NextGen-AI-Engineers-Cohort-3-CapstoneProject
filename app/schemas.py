@@ -36,6 +36,11 @@ class DocumentDetailResponse(DocumentListItem):
     can_edit: bool
     can_view: bool
     error_message: str | None = None
+    patient_details: dict | None = None
+    medical_details: dict | None = None
+    abnormal_findings: list[dict] = Field(default_factory=list)
+    recommendations: list[dict] = Field(default_factory=list)
+    citations: list[dict] = Field(default_factory=list)
 
 
 class UploadResponse(BaseModel):

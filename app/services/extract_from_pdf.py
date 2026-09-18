@@ -1,20 +1,35 @@
 from pathlib import Path
 
+from pypdf import PdfReader
 
-def extract_from_pdf(file_path: str) -> tuple[dict[str, str], dict[str, str]]:
-    """Return patient and medical data for the document workflow."""
-    display_name = Path(file_path).stem.replace("_", " ").replace("-", " ").title()
+from app.services.ai.client import generate_structured
+from app.services.ai.prompts import REPORT_ANALYSIS_SYSTEM
+from app.services.ai.schemas import ReportAnalysis
 
-    patient_details = {
-        "patient_id": "PX-1042",
-        "patient_name": "Jordan Ellis",
-        "date_of_birth": "1988-04-12",
-        "source_file": display_name,
-    }
-    medical_details = {
-        "presenting_concern": "Persistent fatigue and intermittent dizziness",
-        "history": "Symptoms reported over the last six weeks with no acute distress noted",
-        "medications": "Lisinopril 10 mg daily; vitamin D supplement",
-        "observations": "Follow-up laboratory review recommended",
-    }
-    return patient_details, medical_details
+
+MAX_REPORT_CHARS = 60_000
+
+
+def read_pdf_text(file_path: str) -> str:
+    """Return the plain text of a PDF, joined across pages."""
+    reader = PdfReader(str(file_path))
+    return "\n".join(page.extract_text() or "" for page in reader.pages).strip()
+
+
+def extract_from_pdf(file_path: str, *, client=None) -> ReportAnalysis:
+    """Report Analysis Agent: turn a clinical PDF into structured findings."""
+    report_text = read_pdf_text(file_path)
+    if not report_text:
+        raise ValueError(
+            f"No readable text found in {Path(file_path).name}. "
+            "Scanned or image-only PDFs are not supported."
+        )
+
+    prompt = (
+        f"Clinical report file name: {Path(file_path).name}\n\n"
+        "Analyse the following clinical report and return the structured result.\n\n"
+        "--- BEGIN REPORT ---\n"
+        f"{report_text[:MAX_REPORT_CHARS]}\n"
+        "--- END REPORT ---"
+    )
+    return generate_structured(ReportAnalysis, prompt, REPORT_ANALYSIS_SYSTEM, client=client)

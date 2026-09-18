@@ -1,24 +1,26 @@
-def summarise_and_generate_test(
-    patient_details: dict[str, str],
-    medical_details: dict[str, str],
-    reference_docs: list[dict[str, str]],
-) -> str:
-    """Create the generated summary from the three workflow inputs."""
-    patient_name = patient_details.get("patient_name", "the patient")
-    concern = medical_details.get("presenting_concern", "the reported concern")
-    medications = medical_details.get("medications", "No medications supplied")
-    reference_titles = ", ".join(document["title"] for document in reference_docs)
+from app.services.ai.client import generate_structured
+from app.services.ai.prompts import SUMMARY_SYSTEM, format_citations, format_findings
+from app.services.ai.schemas import ClinicalSummary, GuidelineCitation, ReportAnalysis
 
-    return (
-        f"Clinical synthesis for {patient_name}\n\n"
-        f"Presenting concern\n{concern}\n\n"
-        f"Current medications\n{medications}\n\n"
-        "Recommended review\n"
-        "Confirm symptom duration, review hydration and medication adherence, and "
-        "consider the next routine laboratory panel with the supervising clinician.\n\n"
-        "Generated review checks\n"
-        "- Confirm the patient identity and document date.\n"
-        "- Reconcile current medication and recent changes.\n"
-        "- Record follow-up actions and escalation criteria.\n\n"
-        f"Reference set\n{reference_titles}"
+
+def summarise_and_generate_test(
+    analysis: ReportAnalysis,
+    reference_docs: list[GuidelineCitation],
+    *,
+    client=None,
+) -> ClinicalSummary:
+    """Summary Agent: write the clinician-facing summary of an analysed report."""
+    patient = analysis.patient
+    prompt = (
+        f"Patient: {patient.patient_name} (ID {patient.patient_id}, "
+        f"born {patient.date_of_birth}, sex {patient.sex})\n"
+        f"Encounter date: {patient.encounter_date}\n"
+        f"Presenting concern: {analysis.presenting_concern}\n"
+        f"History: {analysis.history}\n"
+        f"Medications: {', '.join(analysis.medications) or 'none recorded'}\n\n"
+        "Abnormal findings:\n"
+        f"{format_findings(analysis.abnormal_findings)}\n\n"
+        "Retrieved guideline excerpts:\n"
+        f"{format_citations(reference_docs)}"
     )
+    return generate_structured(ClinicalSummary, prompt, SUMMARY_SYSTEM, client=client)

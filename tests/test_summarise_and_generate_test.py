@@ -1,34 +1,72 @@
-from inspect import signature
+import pytest
 
+from app.services.ai.client import GeminiResponseError
+from app.services.ai.schemas import (
+    GuidelineCitation,
+    LabFinding,
+    PatientProfile,
+    ReportAnalysis,
+)
 from app.services.summarise_and_generate_test import summarise_and_generate_test
 
 
-def test_summarise_and_generate_test_accepts_three_inputs_without_history():
-    assert list(signature(summarise_and_generate_test).parameters) == [
-        "patient_details",
-        "medical_details",
-        "reference_docs",
-    ]
+SUMMARY_PAYLOAD = {
+    "headline": "Critically low haemoglobin needs same-day review",
+    "summary": "Haemoglobin is 78 g/L against a range of 130 to 175 g/L.",
+    "key_points": ["Arrange same-day assessment", "Repeat the full blood count"],
+}
 
-    summary = summarise_and_generate_test(
-        {"patient_name": "Jordan Ellis"},
-        {
-            "presenting_concern": "Persistent fatigue and intermittent dizziness",
-            "history": "This history should stay out of the generated summary",
-            "medications": "Lisinopril 10 mg daily; vitamin D supplement",
-        },
-        [
-            {
-                "title": "Primary care follow-up pathway",
-                "source": "Neuron clinical protocol library",
-                "relevance": "Suggested review path.",
-            }
+
+def _analysis() -> ReportAnalysis:
+    return ReportAnalysis(
+        patient=PatientProfile(
+            patient_id="PX-1042",
+            patient_name="Jordan Ellis",
+            date_of_birth="1988-04-12",
+            sex="Female",
+            encounter_date="2026-03-04",
+        ),
+        presenting_concern="Persistent fatigue and intermittent dizziness",
+        history="Six weeks of symptoms.",
+        medications=["Lisinopril 10 mg daily"],
+        findings=[
+            LabFinding(
+                test_name="Haemoglobin",
+                value="78",
+                unit="g/L",
+                reference_range="130 - 175",
+                flag="critical",
+                interpretation="Severely reduced.",
+            )
         ],
     )
 
-    assert "Clinical synthesis for Jordan Ellis" in summary
-    assert "Persistent fatigue and intermittent dizziness" in summary
-    assert "Lisinopril 10 mg daily; vitamin D supplement" in summary
-    assert "Primary care follow-up pathway" in summary
-    assert "This history should stay out of the generated summary" not in summary
-    assert "Context" not in summary
+
+def test_summary_agent_returns_structured_summary(fake_gemini_client):
+    client = fake_gemini_client(SUMMARY_PAYLOAD)
+    citations = [
+        GuidelineCitation(
+            title="Anaemia Investigation Pathway",
+            source="Neuron Clinical Protocol Library",
+            section="Escalation",
+            excerpt="Haemoglobin below 80 grams per litre requires same-day assessment.",
+            score=0.91,
+        )
+    ]
+
+    summary = summarise_and_generate_test(_analysis(), citations, client=client)
+
+    assert summary.headline.startswith("Critically low haemoglobin")
+    assert len(summary.key_points) == 2
+
+    prompt = client.calls[0]["input"]
+    assert "Haemoglobin" in prompt
+    assert "Anaemia Investigation Pathway" in prompt
+    assert "Jordan Ellis" in prompt
+
+
+def test_summary_agent_rejects_output_that_breaks_the_schema(fake_gemini_client):
+    client = fake_gemini_client({"headline": "only a headline"})
+
+    with pytest.raises(GeminiResponseError, match="ClinicalSummary"):
+        summarise_and_generate_test(_analysis(), [], client=client)

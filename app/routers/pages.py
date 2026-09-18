@@ -1,10 +1,8 @@
 from collections import Counter
 from math import ceil
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,38 +10,15 @@ from app.auth import get_current_user
 from app.database import get_session
 from app.models import Document, DocumentStatus, User
 from app.routers.documents import DEFAULT_PAGE_SIZE, build_document_filters
+from app.templating import create_templates
 
 
 router = APIRouter(tags=["pages"])
-templates = Jinja2Templates(directory=Path(__file__).resolve().parent.parent / "templates")
+templates = create_templates()
 VIEWABLE_STATUSES = {
     DocumentStatus.WORKFLOW_COMPLETED.value,
     DocumentStatus.HITL_COMPLETED.value,
 }
-STATUS_LABELS = {
-    DocumentStatus.SUMMARISING.value: "Summarising",
-    DocumentStatus.WORKFLOW_COMPLETED.value: "Workflow completed",
-    DocumentStatus.HITL_COMPLETED.value: "HITL completed",
-    DocumentStatus.FAILED.value: "Needs attention",
-}
-
-
-def status_label(value: str) -> str:
-    return STATUS_LABELS.get(value, value.replace("_", " ").title())
-
-
-def format_datetime(value) -> str:
-    return value.strftime("%d %b %Y, %H:%M") if value else "-"
-
-
-def username_initials(user) -> str:
-    username = (getattr(user, "email", "") or "").split("@", 1)[0].strip()
-    return (username[:2] or "NR").upper()
-
-
-templates.env.filters["status_label"] = status_label
-templates.env.filters["format_datetime"] = format_datetime
-templates.env.filters["username_initials"] = username_initials
 
 
 def _login_redirect() -> RedirectResponse:
