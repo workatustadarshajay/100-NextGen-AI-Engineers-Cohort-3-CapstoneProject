@@ -9,6 +9,11 @@ from dotenv import load_dotenv
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(PROJECT_ROOT / ".env")
 
+
+if not (os.getenv("LANGSMITH_API_KEY") or "").strip():
+    os.environ["LANGSMITH_TRACING"] = "false"
+    os.environ["LANGSMITH_TRACING_V2"] = "false"
+
 DEFAULT_MODEL = "gemini-3.8-flash"
 DEFAULT_EMBEDDING_MODEL = "gemini-embedding-001"
 DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile"

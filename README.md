@@ -40,6 +40,14 @@ The live dashboard polls `/api/dashboard` and displays the current agent stage w
 All document and operations APIs require an authenticated session. Production startup also
 requires `APP_ENV=production` to be paired with a configured `SESSION_SECRET`.
 
+LangGraph execution is traced to the LangSmith project `my-first-agent` when
+`LANGSMITH_API_KEY` is configured. The local environment enables both current and legacy
+tracing flags for SDK compatibility, names workflow roots `clinical_document_workflow`, and
+records document IDs as metadata. Trace inputs and outputs are hidden by default because the
+workflow handles clinical documents. The LangSmith skills are installed under `.agents/skills/`.
+If a corporate HTTPS proxy replaces certificates, set `REQUESTS_CA_BUNDLE` to the trusted PEM
+bundle path; do not disable TLS verification.
+
 ## Run locally
 
 ```bash
@@ -48,6 +56,7 @@ python3 -m venv .venv
 pip install -r requirements.txt
 
 cp .env.example .env        # then set the API keys and a long random SESSION_SECRET
+# Set LANGSMITH_API_KEY in the environment or local .env to enable LangSmith uploads.
 python scripts/generate_synthetic_data.py
 python scripts/ingest_guidelines.py
 

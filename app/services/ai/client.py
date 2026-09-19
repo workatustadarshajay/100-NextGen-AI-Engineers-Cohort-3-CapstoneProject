@@ -6,6 +6,7 @@ from typing import TypeVar
 from google import genai
 from google.genai import types
 from groq import Groq
+from langsmith import traceable
 from pydantic import BaseModel, ValidationError
 
 from app.config import get_ai_settings
@@ -166,6 +167,34 @@ def _generate_with_groq(
         raise GroqFallbackError(str(error)) from error
 
 
+def _trace_generation_inputs(inputs: dict) -> dict:
+    prompt = inputs.get("prompt")
+    system_instruction = inputs.get("system_instruction")
+    schema = inputs.get("schema")
+    return {
+        "schema": getattr(schema, "__name__", type(schema).__name__),
+        "prompt_chars": len(prompt) if isinstance(prompt, str) else 0,
+        "system_instruction_chars": (
+            len(system_instruction) if isinstance(system_instruction, str) else 0
+        ),
+    }
+
+
+def _trace_generation_output(output) -> dict:
+    return {
+        "schema": type(output).__name__,
+        "field_count": len(type(output).model_fields)
+        if isinstance(output, BaseModel)
+        else 0,
+    }
+
+
+@traceable(
+    name="structured_generation",
+    run_type="llm",
+    process_inputs=_trace_generation_inputs,
+    process_outputs=_trace_generation_output,
+)
 def generate_structured(
     schema: type[SchemaT],
     prompt: str,

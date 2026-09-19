@@ -1,5 +1,7 @@
 .agents
 .github
+.claude
+skills-lock.json
 .venv/
 __pycache__/
 *.py[cod]

@@ -328,7 +328,16 @@ async def run_clinical_workflow(
     final_state = dict(initial_state)
     attempt_token = _stage_attempts.set({})
     try:
-        async for update in graph.astream(initial_state, stream_mode="updates"):
+        trace_config = {
+            "run_name": "clinical_document_workflow",
+            "tags": ["clinical-workflow"],
+            "metadata": {"document_id": document_id},
+        }
+        async for update in graph.astream(
+            initial_state,
+            config=trace_config,
+            stream_mode="updates",
+        ):
             if not isinstance(update, dict):
                 continue
             for node_name, node_update in update.items():
