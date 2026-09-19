@@ -26,9 +26,13 @@ def _login_redirect() -> RedirectResponse:
     return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
 
-@router.get("/", include_in_schema=False)
-async def home() -> RedirectResponse:
-    return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+@router.get("/", response_class=HTMLResponse, response_model=None, include_in_schema=False)
+async def home(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request=request,
+        name="landing.html",
+        context={},
+    )
 
 
 @router.get("/upload", response_class=HTMLResponse, response_model=None, include_in_schema=False)
@@ -134,3 +138,10 @@ async def document_detail_page(
             "current_user": user,
         },
     )
+
+
+@router.get("/{path:path}", include_in_schema=False)
+async def unknown_page(path: str) -> RedirectResponse:
+    if path.startswith("api/"):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    return _login_redirect()

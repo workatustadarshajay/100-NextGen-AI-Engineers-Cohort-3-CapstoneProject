@@ -20,7 +20,7 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 @router.get("/login", response_class=HTMLResponse, response_model=None, include_in_schema=False)
 async def login_page(request: Request) -> HTMLResponse | RedirectResponse:
     if request.session.get("user_id"):
-        return RedirectResponse(url="/documents", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
     return templates.TemplateResponse(request=request, name="login.html", context={})
 
 
@@ -42,7 +42,7 @@ async def login(
         )
 
     request.session["user_id"] = user.id
-    return RedirectResponse(url="/documents", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/register", response_model=None, include_in_schema=False)
@@ -91,7 +91,7 @@ async def register(
     await session.refresh(user)
 
     request.session["user_id"] = user.id
-    return RedirectResponse(url="/documents", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/logout", include_in_schema=False)

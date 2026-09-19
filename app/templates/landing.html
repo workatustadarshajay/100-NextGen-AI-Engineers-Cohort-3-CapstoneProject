@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0a0f1d">
+    <meta name="description" content="SynapseMed turns dense clinical records into clear, source-linked summaries for clinicians.">
+    <title>SynapseMed | Clinical clarity, at machine speed</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', path='css/landing.css') }}">
+</head>
+<body class="landing-body">
+    <header class="landing-nav">
+        <a href="/" class="landing-brand" aria-label="SynapseMed home">
+            <span class="landing-brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+            <span class="landing-brand-name">Synapse<span>Med</span></span>
+        </a>
+        <nav class="landing-nav-links" aria-label="Landing page navigation">
+            <a href="#platform">Platform</a>
+            <a href="#agents">Agents</a>
+            <a href="#security">Trust</a>
+            <a href="#contact">Enterprise</a>
+        </nav>
+        <a href="/login" class="landing-nav-cta">Enter workspace <i data-lucide="arrow-up-right" aria-hidden="true"></i></a>
+    </header>
+
+    <main>
+        <section class="story-scroll" data-story data-renderer="canvas-frame-scrub" aria-label="SynapseMed product story">
+            <div class="story-stage">
+                <canvas class="story-canvas" data-story-canvas aria-hidden="true"></canvas>
+                <div class="stage-vignette" aria-hidden="true"></div>
+                <div class="stage-scanline" aria-hidden="true"></div>
+                    <div class="stage-cursor-glow" aria-hidden="true"></div>
+                    <div class="stage-beam" aria-hidden="true"></div>
+                    <div class="stage-orbit stage-orbit-one" aria-hidden="true"></div>
+                    <div class="stage-orbit stage-orbit-two" aria-hidden="true"></div>
+
+                <div class="story-rail" aria-hidden="true">
+                    <span class="rail-label">Scroll to synthesize</span>
+                    <span class="rail-line"><span data-progress-line></span></span>
+                    <span class="rail-count"><span data-progress-count>00</span><span class="rail-slash">/</span>100</span>
+                </div>
+
+                <div class="story-copy story-hero" data-copy data-start="0" data-end="0.24">
+                    <p class="landing-kicker"><span class="kicker-pulse"></span>Clinical intelligence, reassembled</p>
+                    <h1>Medicine is complex.<br><em>Clarity should not be.</em></h1>
+                    <p class="story-lede">Synthesize unstructured medical records into actionable clinical insights in 3 seconds flat.</p>
+                    <div class="story-actions">
+                        <a href="/login" class="landing-button landing-button-primary">Start free trial <i data-lucide="arrow-right" aria-hidden="true"></i></a>
+                        <span class="action-note"><i data-lucide="shield-check" aria-hidden="true"></i> Built for the human in the loop</span>
+                    </div>
+                </div>
+
+                <div class="story-copy story-side story-side-left" data-copy data-start="0.22" data-end="0.5">
+                    <span class="story-index">01 / 04</span>
+                    <h2><strong>Overwhelming</strong><br>EHR data</h2>
+                    <p>Cross-reference hundreds of pages of unorganized charts instantly.</p>
+                    <span class="side-rule"></span>
+                </div>
+
+                <div class="story-copy story-side story-side-right" data-copy data-start="0.3" data-end="0.56">
+                    <span class="story-index">02 / 04</span>
+                    <h2><strong>Zero</strong><br>hallucinations</h2>
+                    <p>Every key insight stays structurally bound to its original source document via deep, verifiable citations.</p>
+                    <span class="side-rule"></span>
+                </div>
+
+                <div class="story-copy story-callout story-callout-one" data-copy data-start="0.48" data-end="0.79">
+                    <span class="callout-dot"></span>
+                    <span class="story-index">03 / 04</span>
+                    <h2>Chief complaint <span>&amp; HPI</span></h2>
+                    <p>Clean, bulleted chronological history.</p>
+                </div>
+                <div class="story-copy story-callout story-callout-two" data-copy data-start="0.54" data-end="0.82">
+                    <span class="callout-dot"></span>
+                    <span class="story-index">LABS</span>
+                    <h2>Lab anomalies</h2>
+                    <p>Out-of-range biomarkers flagged in high-contrast teal.</p>
+                </div>
+                <div class="story-copy story-callout story-callout-three" data-copy data-start="0.61" data-end="0.86">
+                    <span class="callout-dot"></span>
+                    <span class="story-index">CHAT</span>
+                    <h2>Interactive chat</h2>
+                    <p>Ask questions against the entire patient chart history.</p>
+                </div>
+
+                <div class="story-copy story-final" data-copy data-start="0.78" data-end="1">
+                    <p class="landing-kicker"><span class="kicker-pulse"></span>The clear end state</p>
+                    <h2>Save <em>2 hours</em> of chart review every single shift.</h2>
+                    <a href="/login" class="landing-button landing-button-primary">Request enterprise demo <i data-lucide="arrow-up-right" aria-hidden="true"></i></a>
+                </div>
+
+                <div class="stage-caption" aria-hidden="true">
+                    <span>SynapseMed / 01</span>
+                    <span>Source-linked by design</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="proof-band" id="platform">
+            <div class="landing-container proof-band-inner" data-reveal>
+                <p class="landing-kicker"><span class="kicker-pulse"></span>One workspace, one source of truth</p>
+                <p class="proof-statement">From first page to final sign-off, SynapseMed keeps the clinician in control.</p>
+                <a href="/login" class="text-link">See the workspace <i data-lucide="arrow-up-right" aria-hidden="true"></i></a>
+            </div>
+        </section>
+
+        <section class="feature-section" id="security">
+            <div class="landing-container">
+                <div class="section-heading" data-reveal>
+                    <div>
+                        <p class="landing-kicker"><span class="kicker-pulse"></span>Built for serious clinical work</p>
+                        <h2>Quiet confidence<br><em>at every layer.</em></h2>
+                    </div>
+                    <p>Fast enough for the ward. Structured enough for review. Traceable enough for trust.</p>
+                </div>
+                <div class="feature-grid">
+                    <article class="feature-card feature-card-large" data-reveal data-tilt>
+                        <div class="feature-card-top"><span class="feature-number">01</span><i data-lucide="file-check-2" aria-hidden="true"></i></div>
+                        <h3>Source-linked insights</h3>
+                        <p>Jump from a generated finding straight back to the page, excerpt, and guideline that support it.</p>
+                        <div class="mini-source-ui" aria-hidden="true"><span class="mini-source-bar"></span><span class="mini-source-bar short"></span><span class="mini-source-cite">p. 04 / verified</span></div>
+                    </article>
+                    <article class="feature-card feature-card-accent" data-reveal data-tilt>
+                        <div class="feature-card-top"><span class="feature-number">02</span><i data-lucide="scan-text" aria-hidden="true"></i></div>
+                        <h3>Structured by default</h3>
+                        <p>Summaries, anomalies, and follow-up recommendations stay editable, reviewable, and consistent.</p>
+                    </article>
+                    <article class="feature-card" data-reveal data-tilt>
+                        <div class="feature-card-top"><span class="feature-number">03</span><i data-lucide="lock-keyhole" aria-hidden="true"></i></div>
+                        <h3>HIPAA-ready posture</h3>
+                        <p>Private workflow boundaries and human sign-off keep sensitive work in the right hands.</p>
+                    </article>
+                    <article class="feature-card feature-card-wide" data-reveal data-tilt>
+                        <div class="feature-card-top"><span class="feature-number">04</span><i data-lucide="activity" aria-hidden="true"></i></div>
+                        <div><h3>Operational visibility</h3><p>See queues, timings, failures, reviewer load, and workflow events without leaving the clinical operations view.</p></div>
+                        <span class="feature-signal">LIVE <span></span></span>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="agent-section" id="agents">
+            <div class="landing-container">
+                <div class="section-heading agent-section-heading" data-reveal>
+                    <div>
+                        <p class="landing-kicker"><span class="kicker-pulse"></span>The clinical agent team</p>
+                        <h2>Every stage has<br><em>a clear job.</em></h2>
+                    </div>
+                    <p>Seven coordinated roles turn an uploaded report into a source-linked, reviewable decision-support draft. The clinician still owns the final call.</p>
+                </div>
+                <div class="agent-grid">
+                    <article class="agent-card agent-card-lead" data-reveal data-tilt>
+                        <div class="agent-card-top"><span class="agent-number">01</span><span class="agent-tag">INGEST</span></div>
+                        <i data-lucide="file-search-2" class="agent-icon" aria-hidden="true"></i>
+                        <h3>Report Analysis Agent</h3>
+                        <p>Extracts patient context, history, medications, observations, and range-aware lab flags from the uploaded report.</p>
+                    </article>
+                    <article class="agent-card" data-reveal data-tilt>
+                        <div class="agent-card-top"><span class="agent-number">02</span><span class="agent-tag">RETRIEVE</span></div>
+                        <i data-lucide="book-open-check" class="agent-icon" aria-hidden="true"></i>
+                        <h3>Guideline RAG</h3>
+                        <p>Retrieves relevant local and trusted guideline excerpts so each generated insight has a source to inspect.</p>
+                    </article>
+                    <article class="agent-card" data-reveal data-tilt>
+                        <div class="agent-card-top"><span class="agent-number">03</span><span class="agent-tag">ROUTE</span></div>
+                        <i data-lucide="route" class="agent-icon" aria-hidden="true"></i>
+                        <h3>Risk Router</h3>
+                        <p>Directs critical findings to an urgent review lane and standard cases to the normal review queue.</p>
+                    </article>
+                    <article class="agent-card agent-card-accent" data-reveal data-tilt>
+                        <div class="agent-card-top"><span class="agent-number">04</span><span class="agent-tag">GENERATE</span></div>
+                        <i data-lucide="file-text" class="agent-icon" aria-hidden="true"></i>
+                        <h3>Summary Agent</h3>
+                        <p>Turns the analysis and citations into a concise, clinician-facing summary grounded in the supplied evidence.</p>
+                    </article>
+                    <article class="agent-card" data-reveal data-tilt>
+                        <div class="agent-card-top"><span class="agent-number">05</span><span class="agent-tag">PRIORITIZE</span></div>
+                        <i data-lucide="list-checks" class="agent-icon" aria-hidden="true"></i>
+                        <h3>Recommendation Agent</h3>
+                        <p>Proposes one to six prioritized follow-up actions grounded in the retrieved guideline context.</p>
+                    </article>
+                    <article class="agent-card" data-reveal data-tilt>
+                        <div class="agent-card-top"><span class="agent-number">06</span><span class="agent-tag">RECONCILE</span></div>
+                        <i data-lucide="refresh-cw" class="agent-icon" aria-hidden="true"></i>
+                        <h3>Clinical Reconciliation Agent</h3>
+                        <p>Keeps structured findings and recommendations aligned after a reviewer edits the narrative summary.</p>
+                    </article>
+                    <article class="agent-card agent-card-wide" data-reveal data-tilt>
+                        <div class="agent-card-top"><span class="agent-number">07</span><span class="agent-tag">LEARN</span></div>
+                        <i data-lucide="messages-square" class="agent-icon" aria-hidden="true"></i>
+                        <h3>Reviewer Feedback Loop</h3>
+                        <p>Records summary corrections and recommendation decisions as bounded quality signals for future workflow runs. Feedback informs quality; it never replaces clinical evidence.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="trust-section" id="contact">
+            <div class="landing-container trust-inner" data-reveal>
+                <div>
+                    <p class="landing-kicker"><span class="kicker-pulse"></span>Ready when your team is</p>
+                    <h2>Make room for<br><em>the medicine.</em></h2>
+                </div>
+                <div class="trust-cta-block">
+                    <p>Start with a secure workspace for the records already waiting on your team.</p>
+                    <a href="/login" class="landing-button landing-button-primary">Enter SynapseMed <i data-lucide="arrow-right" aria-hidden="true"></i></a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="landing-footer">
+        <div class="landing-container footer-inner">
+            <a href="/" class="landing-brand" aria-label="SynapseMed home">
+                <span class="landing-brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+                <span class="landing-brand-name">Synapse<span>Med</span></span>
+            </a>
+            <span>Clinical clarity, at machine speed.</span>
+            <span>© 2026 SynapseMed</span>
+        </div>
+    </footer>
+
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="{{ url_for('static', path='js/landing.js') }}"></script>
+</body>
+</html>
